@@ -1,5 +1,8 @@
 // Dados do álbum Panini Brasileirão 2026 (Livro Ilustrado Oficial — Séries A e B).
-// Estrutura final fornecida pelo usuário (times, ordem e faixas numéricas).
+// Estrutura conferida contra a descrição oficial do produto (reconcilia
+// exatamente com os 512 anunciados: 380 Série A + 60 Série B + 72 especiais
+// = 512; 40 holográficas = 20 escudos Série A + 20 escudos Série B; 20 corte
+// especial = os 20 Mascotes).
 //
 // Esquema de identificação de cada figurinha:
 // - Jogadores/painéis: numeração ÚNICA E CONTÍNUA, sem prefixo de time —
@@ -7,34 +10,35 @@
 //   Feminino (401..450).
 // - Escudo holográfico: prefixo "E" + número corrido cruzando as duas séries
 //   (E1..E20 Série A, E21..E40 Série B).
-// - Mascote recortado: prefixo "M" + número (M1..M20, um por clube da Série A).
-// - Abertura Institucional: prefixo "CB" + número (CB1..CB15).
+// - Abertura (escudo da CBF + troféu da Série A) e Mascotes (corte especial,
+//   seção própria — não é por time) usam código curto + numeração local
+//   (CB1..CB2, MAS1..MAS20).
 // - Cards (colecionável à parte, não se cola no álbum): cada categoria tem
 //   seu próprio prefixo + numeração local (PC1..PC6, EST1..EST44, etc.).
 const PLAYERS_PER_TEAM = 18;
 
 const SECTIONS = [
   { title: 'Série A', teams: [
-    { name: 'Flamengo', code: 'FLA', color: '#C8102E', playerStart: 1, shieldNumber: 1, mascotNumber: 1 },
-    { name: 'Palmeiras', code: 'PAL', color: '#006437', playerStart: 19, shieldNumber: 2, mascotNumber: 2 },
-    { name: 'Cruzeiro', code: 'CRU', color: '#003399', playerStart: 37, shieldNumber: 3, mascotNumber: 3 },
-    { name: 'Mirassol', code: 'MIR', color: '#FFC400', playerStart: 55, shieldNumber: 4, mascotNumber: 4 },
-    { name: 'Fluminense', code: 'FLU', color: '#7A0C2E', playerStart: 73, shieldNumber: 5, mascotNumber: 5 },
-    { name: 'Botafogo', code: 'BOT', color: '#262626', playerStart: 91, shieldNumber: 6, mascotNumber: 6 },
-    { name: 'Bahia', code: 'BAH', color: '#0055A4', playerStart: 109, shieldNumber: 7, mascotNumber: 7 },
-    { name: 'São Paulo', code: 'SAO', color: '#C10000', playerStart: 127, shieldNumber: 8, mascotNumber: 8 },
-    { name: 'Grêmio', code: 'GRE', color: '#0A5FA8', playerStart: 145, shieldNumber: 9, mascotNumber: 9 },
-    { name: 'Red Bull Bragantino', code: 'RBB', color: '#E30613', playerStart: 163, shieldNumber: 10, mascotNumber: 10 },
-    { name: 'Atlético Mineiro', code: 'CAM', color: '#1A1A1A', playerStart: 181, shieldNumber: 11, mascotNumber: 11 },
-    { name: 'Santos', code: 'SAN', color: '#1A1A1A', playerStart: 199, shieldNumber: 12, mascotNumber: 12 },
-    { name: 'Corinthians', code: 'COR', color: '#111111', playerStart: 217, shieldNumber: 13, mascotNumber: 13 },
-    { name: 'Vasco da Gama', code: 'VAS', color: '#0D0D0D', playerStart: 235, shieldNumber: 14, mascotNumber: 14 },
-    { name: 'Vitória', code: 'VIT', color: '#B22222', playerStart: 253, shieldNumber: 15, mascotNumber: 15 },
-    { name: 'Internacional', code: 'INT', color: '#D81E2C', playerStart: 271, shieldNumber: 16, mascotNumber: 16 },
-    { name: 'Coritiba', code: 'CFC', color: '#0F8A3B', playerStart: 289, shieldNumber: 17, mascotNumber: 17 },
-    { name: 'Athletico Paranaense', code: 'CAP', color: '#CC0000', playerStart: 307, shieldNumber: 18, mascotNumber: 18 },
-    { name: 'Chapecoense', code: 'CHA', color: '#0B6E4F', playerStart: 325, shieldNumber: 19, mascotNumber: 19 },
-    { name: 'Remo', code: 'REM', color: '#0033A0', playerStart: 343, shieldNumber: 20, mascotNumber: 20 },
+    { name: 'Flamengo', code: 'FLA', color: '#C8102E', playerStart: 1, shieldNumber: 1 },
+    { name: 'Palmeiras', code: 'PAL', color: '#006437', playerStart: 19, shieldNumber: 2 },
+    { name: 'Cruzeiro', code: 'CRU', color: '#003399', playerStart: 37, shieldNumber: 3 },
+    { name: 'Mirassol', code: 'MIR', color: '#FFC400', playerStart: 55, shieldNumber: 4 },
+    { name: 'Fluminense', code: 'FLU', color: '#7A0C2E', playerStart: 73, shieldNumber: 5 },
+    { name: 'Botafogo', code: 'BOT', color: '#262626', playerStart: 91, shieldNumber: 6 },
+    { name: 'Bahia', code: 'BAH', color: '#0055A4', playerStart: 109, shieldNumber: 7 },
+    { name: 'São Paulo', code: 'SAO', color: '#C10000', playerStart: 127, shieldNumber: 8 },
+    { name: 'Grêmio', code: 'GRE', color: '#0A5FA8', playerStart: 145, shieldNumber: 9 },
+    { name: 'Red Bull Bragantino', code: 'RBB', color: '#E30613', playerStart: 163, shieldNumber: 10 },
+    { name: 'Atlético Mineiro', code: 'CAM', color: '#1A1A1A', playerStart: 181, shieldNumber: 11 },
+    { name: 'Santos', code: 'SAN', color: '#1A1A1A', playerStart: 199, shieldNumber: 12 },
+    { name: 'Corinthians', code: 'COR', color: '#111111', playerStart: 217, shieldNumber: 13 },
+    { name: 'Vasco da Gama', code: 'VAS', color: '#0D0D0D', playerStart: 235, shieldNumber: 14 },
+    { name: 'Vitória', code: 'VIT', color: '#B22222', playerStart: 253, shieldNumber: 15 },
+    { name: 'Internacional', code: 'INT', color: '#D81E2C', playerStart: 271, shieldNumber: 16 },
+    { name: 'Coritiba', code: 'CFC', color: '#0F8A3B', playerStart: 289, shieldNumber: 17 },
+    { name: 'Athletico Paranaense', code: 'CAP', color: '#CC0000', playerStart: 307, shieldNumber: 18 },
+    { name: 'Chapecoense', code: 'CHA', color: '#0B6E4F', playerStart: 325, shieldNumber: 19 },
+    { name: 'Remo', code: 'REM', color: '#0033A0', playerStart: 343, shieldNumber: 20 },
   ]},
   { title: 'Série B', teams: [
     { name: 'Ceará', code: 'CEA', color: '#1A1A1A', playerStart: 361, playerCount: 2, shieldNumber: 21 },
@@ -59,7 +63,8 @@ const SECTIONS = [
     { name: 'Ponte Preta', code: 'PON', color: '#1A1A1A', playerStart: 399, playerCount: 2, shieldNumber: 40 },
   ]},
   { title: 'Especiais', teams: [
-    { name: 'Abertura Institucional', code: 'CB', color: '#FFCC00', stickerCount: 15, shield: false },
+    { name: 'Abertura Institucional', code: 'CB', color: '#FFCC00', stickerCount: 2, shield: false },
+    { name: 'Mascotes', code: 'MAS', color: '#F4A300', stickerCount: 20, shield: false },
     { name: 'São Eles!', code: 'SEL', color: '#009688', playerStart: 401, playerCount: 11, shield: false },
     { name: 'Jogão', code: 'JOG', color: '#6A4C93', playerStart: 412, playerCount: 11, shield: false },
     { name: 'Homens-Gol', code: 'HGL', color: '#FF5722', playerStart: 423, playerCount: 10, shield: false },
