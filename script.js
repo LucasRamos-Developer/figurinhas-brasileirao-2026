@@ -139,8 +139,14 @@
       const label = (team.numberPrefix || '') + num;
       return { key: label, label, isShield: false };
     }
-    const label = team.code + slot;
-    return { key: label, label, isShield: slot === 1 && team.shield !== false };
+    const num = team.padWidth ? String(slot).padStart(team.padWidth, '0') : slot;
+    const label = team.code + num;
+    // `keyNamespace` mantém a CHAVE de armazenamento única quando o prefixo
+    // visível coincide com o de outra coisa (ex: cards "Estrela" usam "E",
+    // igual ao prefixo do escudo — o rótulo mostrado continua limpo, só a
+    // chave interna leva o namespace pra não colidir).
+    const key = (team.keyNamespace ? team.keyNamespace + ':' : '') + label;
+    return { key, label, isShield: slot === 1 && team.shield !== false };
   }
 
   function getCount(key) {
