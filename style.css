@@ -14,6 +14,27 @@
   --empty: #33455c;
   --danger: #ef4444;
   --radius: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.18);
+  --on-accent: #06210f;
+}
+
+:root[data-theme="light"] {
+  --bg: #f3f5f8;
+  --panel: #ffffff;
+  --panel-2: #f0f3f7;
+  --border: #e1e6ed;
+  --text: #172033;
+  --text-dim: #667085;
+  --accent: #16a34a;
+  --accent-dim: #dcfce7;
+  --dupe: #d97706;
+  --dupe-dim: #fef3c7;
+  --sep: #0284c7;
+  --sep-dim: #e0f2fe;
+  --empty: #d7dde5;
+  --danger: #dc2626;
+  --shadow: 0 2px 10px rgba(23,32,51,0.08);
+  --on-accent: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -24,7 +45,24 @@ body {
   background: var(--bg);
   color: var(--text);
   padding-bottom: 60px;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
+
+/* Ícones (Lucide inline) — herdam a cor do texto ao redor. */
+.icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  vertical-align: -0.15em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.btn .icon, .fab .icon, .btn-icon .icon, .copy-btn .icon, .step-mini .icon, .section-chip .icon { margin-right: 4px; }
+.fab .icon, .btn-icon .icon, .step-mini .icon { margin-right: 0; width: 1.1em; height: 1.1em; }
+h1 .icon, h3 .icon { margin-right: 6px; }
 
 .topbar {
   display: flex;
@@ -95,7 +133,7 @@ body {
 .btn:hover { border-color: var(--accent); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn:disabled:hover { border-color: var(--border); }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #06210f; font-weight: 600; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .btn-owned { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 .btn-dupe { background: var(--dupe-dim); border-color: var(--dupe); color: var(--dupe); }
 .btn.active { background: var(--sep-dim); border-color: var(--sep); color: var(--sep); font-weight: 600; }
@@ -124,7 +162,7 @@ body {
   height: 56px;
   border-radius: 50%;
   background: var(--accent);
-  color: #06210f;
+  color: var(--on-accent);
   border: none;
   font-size: 1.4rem;
   cursor: pointer;
@@ -271,20 +309,39 @@ main#groups {
 .group-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 1rem;
-  color: var(--text-dim);
-  margin: 0 0 10px;
-  letter-spacing: 0.04em;
+  gap: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin: 0 0 14px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.group-title:hover { color: var(--text); }
-.group-chevron { display: inline-block; width: 1em; font-size: 0.85em; }
+.group-title:hover { border-color: var(--accent); }
+.group-title-text { flex: 1; }
+.group-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 2px 9px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.group-chevron { transition: transform 0.18s ease; color: var(--text-dim); }
 
-.group-block.collapsed .group-title { margin-bottom: 0; }
+.group-block.collapsed .group-title { margin-bottom: 0; box-shadow: none; }
+.group-block.collapsed .group-chevron { transform: rotate(-90deg); }
 .group-block.collapsed .group-grid { display: none; }
 
 .group-grid {
@@ -298,10 +355,10 @@ main#groups {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow);
   transition: border-color 0.12s ease, transform 0.12s ease;
 }
-.team-card:hover { border-color: #3a4d64; }
+.team-card:hover { border-color: var(--accent); }
 .team-card.hidden-by-filter { display: none; }
 
 .team-header {
@@ -622,7 +679,7 @@ main#groups {
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent);
-  color: #06210f;
+  color: var(--on-accent);
   padding: 10px 18px;
   border-radius: 8px;
   font-size: 0.85rem;
