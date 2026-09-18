@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figurinhas Brasileirão 2026</title>
+<meta name="theme-color" content="#0a5c36">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Brasileirão 26">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-row">
+    <h1>⚽ Brasileirão 2026</h1>
+    <input type="search" id="filterInput" placeholder="Buscar time ou código…" autocomplete="off">
+  </div>
+  <div class="header-progress">
+    <div class="progress-bar-lg"><div id="albumProgressFill" class="progress-bar-lg-fill"></div></div>
+    <div class="header-progress-labels">
+      <span id="albumProgressText"></span>
+      <span id="cardsProgressText"></span>
+    </div>
+  </div>
+</header>
+
+<nav id="sectionNav" class="section-nav"></nav>
+
+<div id="separationBanner" class="separation-banner hidden"></div>
+
+<main id="groups"></main>
+
+<button id="menuFab" class="fab" aria-label="Abrir menu">☰</button>
+
+<div id="drawerOverlay" class="drawer-overlay">
+  <div class="drawer">
+    <div class="drawer-header">
+      <h2>Menu</h2>
+      <button id="closeDrawerBtn" class="btn-icon" aria-label="Fechar">✕</button>
+    </div>
+    <div class="drawer-stats" id="drawerStats"></div>
+    <div class="drawer-jump">
+      <select id="teamJumpSelect">
+        <option value="">🔎 Ir para um time…</option>
+      </select>
+    </div>
+    <div class="drawer-actions">
+      <button id="openImportBtn" class="btn btn-primary">📋 Colar lista</button>
+      <button id="copyAllBtn" class="btn">📤 Copiar todas as repetidas</button>
+      <button id="separationModeBtn" class="btn">📦 Modo separando</button>
+      <button id="myListsBtn" class="btn">🗂️ Minhas listas</button>
+      <button id="exportJsonBtn" class="btn">💾 Exportar dados (JSON)</button>
+      <button id="importJsonBtn" class="btn">📥 Importar dados (JSON)</button>
+      <input type="file" id="importJsonFile" accept="application/json,.json" hidden>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="dot dot-0"></span> Não tenho</span>
+      <span class="legend-item"><span class="dot dot-1"></span> Tenho</span>
+      <span class="legend-item"><span class="dot dot-2"></span> Tenho repetida</span>
+      <span class="legend-item"><span class="dot dot-sep"></span> Separada</span>
+    </div>
+    <p class="click-hint">Clique numa figurinha pra marcar "tenho" (e somar repetida se clicar de novo) · Shift+clique pra remover (botão direito também funciona, se o navegador deixar).</p>
+  </div>
+</div>
+
+<!-- Colar lista de outra pessoa / minha -->
+<div id="importOverlay" class="overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>Colar lista de figurinhas</h2>
+      <button id="closeImportBtn" class="btn-icon" aria-label="Fechar">✕</button>
+    </div>
+
+    <div id="importStep1">
+      <p class="hint">Cole a lista de outra pessoa pra ver o que você tem pra trocar, ou a sua própria lista pra marcar como "tenho". Jogadores da Série A são números soltos (ex: <code>45, 102, 233</code>) — sem prefixo de time. Escudos, Série B e especiais usam código+número: <code>AME1</code> · <code>JOG: 2, 3</code> · <code>FLA0 (x1)</code>. Só os códigos/números são lidos, o resto é ignorado.</p>
+      <textarea id="importText" rows="8" placeholder="Flamengo · repetidas&#10;4, 6, 8, 15, 18&#10;FLA0"></textarea>
+      <div class="modal-actions">
+        <button id="analyzeBtn" class="btn btn-primary">Analisar</button>
+      </div>
+    </div>
+
+    <div id="importStep2" class="hidden">
+      <div class="import-columns">
+        <div class="import-col">
+          <p class="hint">Status de cada figurinha encontrada no texto:</p>
+          <div id="importPreview" class="import-preview"></div>
+        </div>
+        <div class="import-col import-col-matches">
+          <h3>📤 Você tem pra trocar</h3>
+          <div id="importMatchSummary" class="match-summary hidden"></div>
+          <div class="match-actions">
+            <button id="separateAllBtn" class="btn btn-dupe hidden">📦 Separar lista inteira</button>
+            <button id="copyMatchesBtn" class="btn btn-owned hidden">📤 Copiar lista</button>
+          </div>
+          <div id="importMatches" class="import-matches"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="backBtn" class="btn">← Voltar</button>
+        <button id="applyDupeBtn" class="btn btn-dupe">Marcar tudo como Tenho</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Escolher/criar lista nomeada ao separar -->
+<div id="listPickerOverlay" class="overlay hidden">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 id="listPickerTitle">Separar pra qual lista?</h2>
+      <button id="closeListPickerBtn" class="btn-icon" aria-label="Fechar">✕</button>
+    </div>
+    <div id="listPickerExisting" class="list-picker-existing"></div>
+    <div class="list-picker-new">
+      <input id="listPickerNewName" type="text" placeholder="Nome da nova lista (ex: João)" autocomplete="off">
+      <button id="listPickerCreateBtn" class="btn btn-primary">Criar e usar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gerenciar listas de separadas -->
+<div id="myListsOverlay" class="overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>Minhas listas de separadas</h2>
+      <button id="closeMyListsBtn" class="btn-icon" aria-label="Fechar">✕</button>
+    </div>
+    <div id="myListsContent"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
