@@ -131,7 +131,12 @@
       return { key: label, label, isShield: true };
     }
     if (team.playerStart !== undefined) {
-      const label = String(team.playerStart + slot - 1);
+      // `numberPrefix`, quando presente, prefixa a numeração contínua (ex:
+      // "CB3") em vez de deixá-la solta — usado quando várias seções dividem
+      // a MESMA contagem corrida sem reiniciar (ex: Abertura+São Eles!+
+      // Jogão+Homens-Gol, todos sob "CB").
+      const num = team.playerStart + slot - 1;
+      const label = (team.numberPrefix || '') + num;
       return { key: label, label, isShield: false };
     }
     const label = team.code + slot;

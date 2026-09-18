@@ -57,18 +57,23 @@ const SECTIONS = [
     { name: 'América-MG', code: 'AME', color: '#1B7B3A', playerStart: 387, playerCount: 2, shieldNumber: 34 },
     { name: 'Athletic Club', code: 'ATH', color: '#C8102E', playerStart: 389, playerCount: 2, shieldNumber: 35 },
     { name: 'Botafogo-SP', code: 'BSP', color: '#E0112F', playerStart: 391, playerCount: 2, shieldNumber: 36 },
-    { name: 'Náutico', code: 'NAU', color: '#B71C1C', playerStart: 393, playerCount: 2, shieldNumber: 37 },
+    { name: 'São Bernardo', code: 'SBE', color: '#C62828', playerStart: 393, playerCount: 2, shieldNumber: 37 },
     { name: 'Londrina', code: 'LON', color: '#C62828', playerStart: 395, playerCount: 2, shieldNumber: 38 },
-    { name: 'São Bernardo', code: 'SBE', color: '#C62828', playerStart: 397, playerCount: 2, shieldNumber: 39 },
+    { name: 'Náutico', code: 'NAU', color: '#B71C1C', playerStart: 397, playerCount: 2, shieldNumber: 39 },
     { name: 'Ponte Preta', code: 'PON', color: '#1A1A1A', playerStart: 399, playerCount: 2, shieldNumber: 40 },
   ]},
   { title: 'Especiais', teams: [
-    { name: 'Abertura Institucional', code: 'CB', color: '#FFCC00', stickerCount: 2, shield: false },
-    { name: 'Mascotes', code: 'MAS', color: '#F4A300', stickerCount: 20, shield: false },
-    { name: 'São Eles!', code: 'SEL', color: '#009688', playerStart: 401, playerCount: 11, shield: false },
-    { name: 'Jogão', code: 'JOG', color: '#6A4C93', playerStart: 412, playerCount: 11, shield: false },
-    { name: 'Homens-Gol', code: 'HGL', color: '#FF5722', playerStart: 423, playerCount: 10, shield: false },
-    { name: 'Brasileirão Feminino', code: 'FEM', color: '#E91E63', playerStart: 433, playerCount: 18, shield: false },
+    // Abertura + São Eles! + Jogão + Homens-Gol dividem UMA numeração
+    // contínua sob o prefixo "CB" (CB1..CB34 — 2+11+11+10), sem reiniciar
+    // entre seções. Ordem interna (onde cada seção começa) ainda não foi
+    // 100% confirmada com figurinha física — só a faixa total (1-34) e os
+    // números que o usuário já tem batem com essa divisão.
+    { name: 'Abertura Institucional', code: 'AB', color: '#FFCC00', playerStart: 1, playerCount: 2, numberPrefix: 'CB', shield: false },
+    { name: 'São Eles!', code: 'SEL', color: '#009688', playerStart: 3, playerCount: 11, numberPrefix: 'CB', shield: false },
+    { name: 'Jogão', code: 'JOG', color: '#6A4C93', playerStart: 14, playerCount: 11, numberPrefix: 'CB', shield: false },
+    { name: 'Homens-Gol', code: 'HGL', color: '#FF5722', playerStart: 25, playerCount: 10, numberPrefix: 'CB', shield: false },
+    { name: 'Mascotes', code: 'M', color: '#F4A300', stickerCount: 20, shield: false },
+    { name: 'Brasileirão Feminino', code: 'FEM', color: '#E91E63', playerStart: 401, playerCount: 18, shield: false },
   ]},
   // Cards são um colecionável à parte das figurinhas (vem 1 por envelope,
   // não se cola no álbum) — 98 no total, em 6 categorias, cada uma com seu
