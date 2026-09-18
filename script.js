@@ -100,28 +100,24 @@
   function teamMeta(team) {
     if (team.playerStart !== undefined) {
       const n = team.playerCount || PLAYERS_PER_TEAM;
-      let count = n;
-      if (team.shieldNumber !== undefined) count++;
-      if (team.mascotNumber !== undefined) count++;
-      return { stickerCount: count };
+      return { stickerCount: n + (team.shieldNumber !== undefined ? 1 : 0) };
     }
     return { stickerCount: team.stickerCount || DEFAULT_STICKER_COUNT };
   }
 
   // ---------- Identidade de cada figurinha (chave de armazenamento + rótulo) ----------
 
-  // `slot` percorre as células de um time/seção: 'shield' e 'mascot' são as
-  // peças à parte de cada time (prefixo próprio E/M, numeração cruzando os
-  // times); números 1..N são a numeração global contínua sem prefixo de quem
-  // tem `playerStart`; os demais times usam 1..stickerCount no esquema
-  // código+número (ex: CB3).
+  // `slot` percorre as células de um time/seção: 'shield' é o escudo holo-
+  // gráfico do time (prefixo próprio "E", numeração cruzando as duas séries);
+  // números 1..N são a numeração global contínua sem prefixo de quem tem
+  // `playerStart`; os demais times usam 1..stickerCount no esquema
+  // código+número (ex: CB2, MAS7).
   function teamSlots(team, meta) {
     if (team.playerStart !== undefined) {
       const n = team.playerCount || PLAYERS_PER_TEAM;
       const slots = [];
       if (team.shieldNumber !== undefined) slots.push('shield');
       for (let i = 1; i <= n; i++) slots.push(i);
-      if (team.mascotNumber !== undefined) slots.push('mascot');
       return slots;
     }
     const slots = [];
@@ -133,10 +129,6 @@
     if (slot === 'shield') {
       const label = 'E' + team.shieldNumber;
       return { key: label, label, isShield: true };
-    }
-    if (slot === 'mascot') {
-      const label = 'M' + team.mascotNumber;
-      return { key: label, label, isShield: false };
     }
     if (team.playerStart !== undefined) {
       const label = String(team.playerStart + slot - 1);
