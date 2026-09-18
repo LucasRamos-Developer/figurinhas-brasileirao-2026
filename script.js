@@ -15,6 +15,48 @@
   // Modo "separando": estado só de interação, não é salvo entre sessões.
   let separationMode = false;
 
+  // ---------- Ícones (SVG inline, estilo Lucide/MIT — sem CDN, funciona offline) ----------
+
+  const ICON_SHAPES = {
+    menu: '<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    clipboard: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+    copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+    package: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/>',
+    folder: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+    download: '<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
+    upload: '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
+    alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    trash: '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    shuffle: '<path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/>',
+    stop: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+    trophy: '<path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/>',
+    search: '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+    chevronDown: '<path d="m6 9 6 6 6-6"/>',
+    plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    minus: '<path d="M5 12h14"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+    moon: '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>',
+  };
+
+  function icon(name) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('class', 'icon');
+    svg.innerHTML = ICON_SHAPES[name] || '';
+    return svg;
+  }
+
+  // Botões estáticos do HTML só marcam `data-icon="nome"` — o ícone entra
+  // no início do elemento sem precisar duplicar SVG no markup.
+  function injectStaticIcons() {
+    document.querySelectorAll('[data-icon]').forEach((el) => {
+      el.prepend(icon(el.dataset.icon));
+    });
+  }
+
   // Índice de toda figurinha/card válido no álbum (chave -> {label, teamName}),
   // construído uma vez a partir de data.js — usado pra validar o que foi
   // colado numa lista de texto, seja número solto (jogador/painel/card) ou
@@ -51,7 +93,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       console.error('Falha ao salvar no navegador.', e);
-      showToast('⚠️ Não consegui salvar (armazenamento cheio ou bloqueado).');
+      showToast('Não consegui salvar (armazenamento cheio ou bloqueado).');
     }
   }
 
@@ -386,7 +428,7 @@
 
     const copyBtn = document.createElement('button');
     copyBtn.className = 'copy-btn';
-    copyBtn.textContent = '📤';
+    copyBtn.appendChild(icon('copy'));
     copyBtn.title = 'Copiar repetidas desse time';
     copyBtn.addEventListener('click', () => copyDupesForTeams([team]));
 
@@ -497,10 +539,15 @@
 
       const h2 = document.createElement('h2');
       h2.className = 'group-title';
-      const chevron = document.createElement('span');
-      chevron.className = 'group-chevron';
-      chevron.textContent = isCollapsed ? '▸' : '▾';
-      h2.append(chevron, document.createTextNode(section.title));
+      const titleText = document.createElement('span');
+      titleText.className = 'group-title-text';
+      titleText.textContent = section.title;
+      const count = document.createElement('span');
+      count.className = 'group-count';
+      count.textContent = section.teams.length;
+      const chevron = icon('chevronDown');
+      chevron.classList.add('group-chevron');
+      h2.append(titleText, count, chevron);
       h2.addEventListener('click', () => toggleSection(section.title));
       block.appendChild(h2);
 
@@ -566,11 +613,13 @@
     const list = activeList();
     const text = document.createElement('span');
     text.className = 'separation-banner-text';
-    text.textContent = `📦 Modo separando ativo — lista: ${list ? list.name : '(nenhuma)'}. Clique numa repetida pra separar, shift+clique pra tirar.`;
+    text.append(icon('package'), document.createTextNode(
+      ` Modo separando ativo — lista: ${list ? list.name : '(nenhuma)'}. Clique numa repetida pra separar, shift+clique pra tirar.`
+    ));
 
     const switchBtn = document.createElement('button');
     switchBtn.className = 'btn btn-tiny';
-    switchBtn.textContent = '🔀 Trocar lista';
+    switchBtn.append(icon('shuffle'), document.createTextNode(' Trocar lista'));
     switchBtn.addEventListener('click', () => {
       openListPicker('Trocar pra qual lista?', (listId) => {
         activeListId = listId;
@@ -580,7 +629,7 @@
 
     const stopBtn = document.createElement('button');
     stopBtn.className = 'btn btn-tiny';
-    stopBtn.textContent = '⏹️ Parar';
+    stopBtn.append(icon('stop'), document.createTextNode(' Parar'));
     stopBtn.addEventListener('click', () => setSeparationMode(false));
 
     banner.append(text, switchBtn, stopBtn);
@@ -646,12 +695,12 @@
 
       const copyBtn = document.createElement('button');
       copyBtn.className = 'btn';
-      copyBtn.textContent = '📤 Copiar';
+      copyBtn.append(icon('copy'), document.createTextNode(' Copiar'));
       copyBtn.addEventListener('click', () => copyTradeList(list));
 
       const deliverAllBtn = document.createElement('button');
       deliverAllBtn.className = 'btn btn-owned';
-      deliverAllBtn.textContent = '✅ Marcar tudo como entregue';
+      deliverAllBtn.append(icon('check'), document.createTextNode(' Marcar tudo como entregue'));
       deliverAllBtn.disabled = itemCount === 0;
       deliverAllBtn.addEventListener('click', () => {
         deliverList(list.id);
@@ -662,7 +711,7 @@
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'btn';
-      deleteBtn.textContent = '🗑️ Excluir lista';
+      deleteBtn.append(icon('trash'), document.createTextNode(' Excluir lista'));
       deleteBtn.disabled = itemCount > 0;
       deleteBtn.title = itemCount > 0 ? 'Entregue ou remova os itens antes de excluir' : 'Excluir lista vazia';
       deleteBtn.addEventListener('click', () => {
@@ -686,7 +735,7 @@
 
         const minusBtn = document.createElement('button');
         minusBtn.className = 'step-mini';
-        minusBtn.textContent = '−';
+        minusBtn.appendChild(icon('minus'));
         minusBtn.title = 'Tirar 1 dessa lista (não entrega, só desmarca)';
         minusBtn.addEventListener('click', () => {
           addAllocation(list.id, entry.key, entry.label, -1);
@@ -696,7 +745,7 @@
 
         const plusBtn = document.createElement('button');
         plusBtn.className = 'step-mini';
-        plusBtn.textContent = '+';
+        plusBtn.appendChild(icon('plus'));
         plusBtn.title = 'Separar mais uma dessa figurinha pra essa lista';
         plusBtn.addEventListener('click', () => {
           addAllocation(list.id, entry.key, entry.label, 1);
@@ -706,7 +755,7 @@
 
         const deliverBtn = document.createElement('button');
         deliverBtn.className = 'btn btn-owned btn-tiny';
-        deliverBtn.textContent = 'Entregue';
+        deliverBtn.append(icon('check'), document.createTextNode(' Entregue'));
         deliverBtn.addEventListener('click', () => {
           deliverItem(list.id, key);
           renderAll();
@@ -882,7 +931,7 @@
 
       const sepBtn = document.createElement('button');
       sepBtn.className = 'btn btn-dupe btn-tiny';
-      sepBtn.textContent = '📦 Separar';
+      sepBtn.append(icon('package'), document.createTextNode(' Separar'));
       sepBtn.addEventListener('click', () => {
         separateOneViaPicker(t.key, t.label, t.teamName, renderImportMatches);
       });
@@ -914,7 +963,7 @@
       statusEl.className = 'preview-status';
       if (t.exists) {
         statusEl.textContent = isMatch
-          ? `${t.teamName} — você TEM repetida (${count - 1}x), pode oferecer! ✅`
+          ? `${t.teamName} — você TEM repetida (${count - 1}x), pode oferecer!`
           : `${t.teamName} — você não tem repetida dessa`;
       } else {
         statusEl.textContent = 'Código não reconhecido no álbum — será ignorado';
@@ -1012,7 +1061,7 @@
         }
       } catch (e) {
         console.warn('Falha ao ler arquivo de importação.', e);
-        showToast('⚠️ Arquivo inválido, não foi possível importar.');
+        showToast('Arquivo inválido, não foi possível importar.');
         return;
       }
       if (!window.confirm('Importar vai substituir os dados salvos neste navegador. Continuar?')) return;
@@ -1025,6 +1074,35 @@
       showToast('Dados importados!');
     };
     reader.readAsText(file);
+  }
+
+  // ---------- Tema claro/escuro ----------
+
+  const THEME_KEY = 'figurinhas-brasileirao-2026-theme';
+
+  function getTheme() {
+    try {
+      return localStorage.getItem(THEME_KEY) || 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const btn = document.getElementById('themeToggleBtn');
+    if (!btn) return;
+    btn.innerHTML = '';
+    btn.append(
+      icon(theme === 'light' ? 'moon' : 'sun'),
+      document.createTextNode(theme === 'light' ? ' Tema escuro' : ' Tema claro')
+    );
+  }
+
+  function toggleTheme() {
+    const next = getTheme() === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* segue sem salvar a preferência */ }
+    applyTheme(next);
   }
 
   // ---------- Toast ----------
@@ -1042,6 +1120,8 @@
 
   function init() {
     load();
+    injectStaticIcons();
+    applyTheme(getTheme());
     renderSectionNav();
     renderTeamJump();
     renderAll();
@@ -1062,6 +1142,8 @@
     document.getElementById('importOverlay').addEventListener('click', (ev) => {
       if (ev.target.id === 'importOverlay') closeImport();
     });
+
+    document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
 
     document.getElementById('exportJsonBtn').addEventListener('click', exportData);
     document.getElementById('importJsonBtn').addEventListener('click', () => document.getElementById('importJsonFile').click());

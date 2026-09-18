@@ -3,7 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Figurinhas Brasileirão 2026</title>
+<title>Figurinhas Brasileirão 2026 — Controle de figurinhas e cards do álbum Panini</title>
+<meta name="description" content="Controle online e gratuito do álbum de figurinhas Panini do Brasileirão 2026: marque o que você já tem, acompanhe o progresso do álbum e dos cards, e organize trocas de repetidas com amigos. Funciona offline, sem cadastro.">
+<meta name="keywords" content="figurinhas brasileirão 2026, álbum panini brasileirão, figurinhas repetidas, troca de figurinhas, checklist álbum panini, controle de figurinhas online">
+<meta name="author" content="Lucas Ramos">
+<link rel="canonical" href="https://lucasramos-developer.github.io/figurinhas-brasileirao-2026/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Figurinhas Brasileirão 2026">
+<meta property="og:title" content="Figurinhas Brasileirão 2026 — Controle de figurinhas e cards do álbum Panini">
+<meta property="og:description" content="Marque o que você já tem, acompanhe o progresso do álbum Panini do Brasileirão 2026 e organize trocas de repetidas com amigos — direto do navegador, funciona offline.">
+<meta property="og:url" content="https://lucasramos-developer.github.io/figurinhas-brasileirao-2026/">
+<meta property="og:image" content="https://lucasramos-developer.github.io/figurinhas-brasileirao-2026/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="pt_BR">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Figurinhas Brasileirão 2026 — Controle de figurinhas e cards do álbum Panini">
+<meta name="twitter:description" content="Marque o que você já tem, acompanhe o progresso do álbum e organize trocas de repetidas — funciona offline, sem cadastro.">
+<meta name="twitter:image" content="https://lucasramos-developer.github.io/figurinhas-brasileirao-2026/icons/og-image.png">
+
 <meta name="theme-color" content="#0a5c36">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
@@ -13,11 +33,32 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Brasileirão 26">
 <link rel="stylesheet" href="style.css">
+<script>
+  // Aplica o tema salvo antes da 1ª pintura da página, pra não piscar o
+  // tema errado por uma fração de segundo (o script.js só carrega depois).
+  try {
+    var t = localStorage.getItem('figurinhas-brasileirao-2026-theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Figurinhas Brasileirão 2026",
+  "description": "Controle online e gratuito do álbum de figurinhas Panini do Brasileirão 2026: marque o que você já tem, acompanhe o progresso e organize trocas de repetidas.",
+  "url": "https://lucasramos-developer.github.io/figurinhas-brasileirao-2026/",
+  "applicationCategory": "LifestyleApplication",
+  "operatingSystem": "Any",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" },
+  "inLanguage": "pt-BR"
+}
+</script>
 </head>
 <body>
 <header class="topbar">
   <div class="topbar-row">
-    <h1>⚽ Brasileirão 2026</h1>
+    <h1><span data-icon="trophy"></span> Brasileirão 2026</h1>
     <input type="search" id="filterInput" placeholder="Buscar time ou código…" autocomplete="off">
   </div>
   <div class="header-progress">
@@ -35,27 +76,28 @@
 
 <main id="groups"></main>
 
-<button id="menuFab" class="fab" aria-label="Abrir menu">☰</button>
+<button id="menuFab" class="fab" aria-label="Abrir menu" data-icon="menu"></button>
 
 <div id="drawerOverlay" class="drawer-overlay">
   <div class="drawer">
     <div class="drawer-header">
       <h2>Menu</h2>
-      <button id="closeDrawerBtn" class="btn-icon" aria-label="Fechar">✕</button>
+      <button id="closeDrawerBtn" class="btn-icon" aria-label="Fechar" data-icon="x"></button>
     </div>
     <div class="drawer-stats" id="drawerStats"></div>
     <div class="drawer-jump">
       <select id="teamJumpSelect">
-        <option value="">🔎 Ir para um time…</option>
+        <option value="">Ir para um time…</option>
       </select>
     </div>
     <div class="drawer-actions">
-      <button id="openImportBtn" class="btn btn-primary">📋 Colar lista</button>
-      <button id="copyAllBtn" class="btn">📤 Copiar todas as repetidas</button>
-      <button id="separationModeBtn" class="btn">📦 Modo separando</button>
-      <button id="myListsBtn" class="btn">🗂️ Minhas listas</button>
-      <button id="exportJsonBtn" class="btn">💾 Exportar dados (JSON)</button>
-      <button id="importJsonBtn" class="btn">📥 Importar dados (JSON)</button>
+      <button id="openImportBtn" class="btn btn-primary" data-icon="clipboard"> Colar lista</button>
+      <button id="copyAllBtn" class="btn" data-icon="copy"> Copiar todas as repetidas</button>
+      <button id="separationModeBtn" class="btn" data-icon="package"> Modo separando</button>
+      <button id="myListsBtn" class="btn" data-icon="folder"> Minhas listas</button>
+      <button id="exportJsonBtn" class="btn" data-icon="download"> Exportar dados (JSON)</button>
+      <button id="importJsonBtn" class="btn" data-icon="upload"> Importar dados (JSON)</button>
+      <button id="themeToggleBtn" class="btn"></button>
       <input type="file" id="importJsonFile" accept="application/json,.json" hidden>
     </div>
     <div class="legend">
@@ -73,7 +115,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>Colar lista de figurinhas</h2>
-      <button id="closeImportBtn" class="btn-icon" aria-label="Fechar">✕</button>
+      <button id="closeImportBtn" class="btn-icon" aria-label="Fechar" data-icon="x"></button>
     </div>
 
     <div id="importStep1">
@@ -91,11 +133,11 @@
           <div id="importPreview" class="import-preview"></div>
         </div>
         <div class="import-col import-col-matches">
-          <h3>📤 Você tem pra trocar</h3>
+          <h3 data-icon="copy"> Você tem pra trocar</h3>
           <div id="importMatchSummary" class="match-summary hidden"></div>
           <div class="match-actions">
-            <button id="separateAllBtn" class="btn btn-dupe hidden">📦 Separar lista inteira</button>
-            <button id="copyMatchesBtn" class="btn btn-owned hidden">📤 Copiar lista</button>
+            <button id="separateAllBtn" class="btn btn-dupe hidden" data-icon="package"> Separar lista inteira</button>
+            <button id="copyMatchesBtn" class="btn btn-owned hidden" data-icon="copy"> Copiar lista</button>
           </div>
           <div id="importMatches" class="import-matches"></div>
         </div>
@@ -113,7 +155,7 @@
   <div class="modal modal-sm">
     <div class="modal-header">
       <h2 id="listPickerTitle">Separar pra qual lista?</h2>
-      <button id="closeListPickerBtn" class="btn-icon" aria-label="Fechar">✕</button>
+      <button id="closeListPickerBtn" class="btn-icon" aria-label="Fechar" data-icon="x"></button>
     </div>
     <div id="listPickerExisting" class="list-picker-existing"></div>
     <div class="list-picker-new">
@@ -128,7 +170,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>Minhas listas de separadas</h2>
-      <button id="closeMyListsBtn" class="btn-icon" aria-label="Fechar">✕</button>
+      <button id="closeMyListsBtn" class="btn-icon" aria-label="Fechar" data-icon="x"></button>
     </div>
     <div id="myListsContent"></div>
   </div>

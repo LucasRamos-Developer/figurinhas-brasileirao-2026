@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lucasramos-developer.github.io/figurinhas-brasileirao-2026/sitemap.xml
