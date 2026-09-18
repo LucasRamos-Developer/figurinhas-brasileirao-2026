@@ -76,16 +76,20 @@ const SECTIONS = [
     { name: 'Brasileirão Feminino', code: 'FEM', color: '#E91E63', playerStart: 401, playerCount: 18, shield: false },
   ]},
   // Cards são um colecionável à parte das figurinhas (vem 1 por envelope,
-  // não se cola no álbum) — 98 no total, em 6 categorias, cada uma com seu
-  // próprio prefixo e numeração local (ex: PC1..PC6), sem cruzar com a
-  // numeração das figurinhas.
+  // não se cola no álbum) — 98 no total, em 6 categorias. Cada uma usa 1
+  // letra + número com 2 dígitos (ex: D01, I01, E36, T04), confirmado pelo
+  // usuário com cards físicos — exceto Prata da Casa (P) e Legend (L), que
+  // são o palpite mais provável (Luva Dourada usa "D" pra não colidir com
+  // "L" do Legend) até serem conferidos com card físico.
+  // `keyNamespace: 'card'` evita que o prefixo "E" de Estrela colida com o
+  // "E" do escudo das figurinhas (mesma letra, coisas diferentes).
   { title: 'Cards', teams: [
-    { name: 'Prata da Casa', code: 'PC', color: '#B0BEC5', stickerCount: 6, shield: false },
-    { name: 'Estrela', code: 'EST', color: '#FFD700', stickerCount: 44, shield: false },
-    { name: 'Luva Dourada', code: 'LD', color: '#DAA520', stickerCount: 14, shield: false },
-    { name: 'Ídolo', code: 'IDO', color: '#9C27B0', stickerCount: 14, shield: false },
-    { name: 'Top Player', code: 'TP', color: '#2196F3', stickerCount: 12, shield: false },
-    { name: 'Legend', code: 'LEG', color: '#FF6F00', stickerCount: 8, shield: false },
+    { name: 'Prata da Casa', code: 'P', color: '#B0BEC5', stickerCount: 6, padWidth: 2, keyNamespace: 'card', shield: false },
+    { name: 'Estrela', code: 'E', color: '#FFD700', stickerCount: 44, padWidth: 2, keyNamespace: 'card', shield: false },
+    { name: 'Luva Dourada', code: 'D', color: '#DAA520', stickerCount: 14, padWidth: 2, keyNamespace: 'card', shield: false },
+    { name: 'Ídolo', code: 'I', color: '#9C27B0', stickerCount: 14, padWidth: 2, keyNamespace: 'card', shield: false },
+    { name: 'Top Player', code: 'T', color: '#2196F3', stickerCount: 12, padWidth: 2, keyNamespace: 'card', shield: false },
+    { name: 'Legend', code: 'L', color: '#FF6F00', stickerCount: 8, padWidth: 2, keyNamespace: 'card', shield: false },
   ]},
 ];
 
