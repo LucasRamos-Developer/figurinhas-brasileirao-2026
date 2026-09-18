@@ -57,9 +57,9 @@ const SECTIONS = [
     { name: 'América-MG', code: 'AME', color: '#1B7B3A', playerStart: 387, playerCount: 2, shieldNumber: 34 },
     { name: 'Athletic Club', code: 'ATH', color: '#C8102E', playerStart: 389, playerCount: 2, shieldNumber: 35 },
     { name: 'Botafogo-SP', code: 'BSP', color: '#E0112F', playerStart: 391, playerCount: 2, shieldNumber: 36 },
-    { name: 'Brusque', code: 'BRU', color: '#FFC107', playerStart: 393, playerCount: 2, shieldNumber: 37 },
-    { name: 'Guarani', code: 'GUA', color: '#2E7D32', playerStart: 395, playerCount: 2, shieldNumber: 38 },
-    { name: 'Ituano', code: 'ITU', color: '#C9A227', playerStart: 397, playerCount: 2, shieldNumber: 39 },
+    { name: 'Náutico', code: 'NAU', color: '#B71C1C', playerStart: 393, playerCount: 2, shieldNumber: 37 },
+    { name: 'Londrina', code: 'LON', color: '#C62828', playerStart: 395, playerCount: 2, shieldNumber: 38 },
+    { name: 'São Bernardo', code: 'SBE', color: '#C62828', playerStart: 397, playerCount: 2, shieldNumber: 39 },
     { name: 'Ponte Preta', code: 'PON', color: '#1A1A1A', playerStart: 399, playerCount: 2, shieldNumber: 40 },
   ]},
   { title: 'Especiais', teams: [
