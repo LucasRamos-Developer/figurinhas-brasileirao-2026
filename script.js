@@ -1519,6 +1519,10 @@
     renderAll();
 
     initStickerEvents();
+    document.getElementById('titleLink').addEventListener('click', (ev) => {
+      ev.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
     document.getElementById('filterInput').addEventListener('input', () => {
       applyFilter();
       scheduleScrollToFound();

@@ -126,6 +126,8 @@ h1 .icon, h3 .icon { margin-right: 6px; }
   .search-toggle { display: none; }
 }
 
+.title-link { color: inherit; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.title-link:hover { color: var(--accent); }
 .topbar h1 {
   font-size: 1.05rem;
   margin: 0;
@@ -258,6 +260,8 @@ h1 .icon, h3 .icon { margin-right: 6px; }
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.25s ease, visibility 0.25s ease;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
 }
 .drawer-overlay.open {
   opacity: 1;
@@ -860,4 +864,27 @@ main#groups {
   .hp-bar { height: 7px; border-radius: 4px; }
   .hp-fill { border-radius: 4px; }
   .hp-value { min-width: 54px; }
+}
+
+/* Menu lateral: o painel desliza da direita e cada bloco entra em cascata. */
+.drawer-overlay.open .drawer > *,
+.drawer-overlay.open .drawer-actions > .btn {
+  animation: drawer-item-in 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.drawer-overlay.open .drawer > :nth-child(1) { animation-delay: 0.10s; }
+.drawer-overlay.open .drawer > :nth-child(2) { animation-delay: 0.14s; }
+.drawer-overlay.open .drawer > :nth-child(3) { animation-delay: 0.18s; }
+.drawer-overlay.open .drawer > :nth-child(5) { animation-delay: 0.42s; }
+.drawer-overlay.open .drawer > :nth-child(6) { animation-delay: 0.46s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(1) { animation-delay: 0.20s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(2) { animation-delay: 0.23s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(3) { animation-delay: 0.26s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(4) { animation-delay: 0.29s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(5) { animation-delay: 0.32s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(6) { animation-delay: 0.35s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(7) { animation-delay: 0.38s; }
+.drawer-overlay.open .drawer-actions > .btn:nth-child(8) { animation-delay: 0.41s; }
+@keyframes drawer-item-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: none; }
 }
