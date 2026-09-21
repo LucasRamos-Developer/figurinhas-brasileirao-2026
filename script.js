@@ -66,8 +66,8 @@
     section.teams.forEach((team) => {
       const meta = teamMeta(team);
       teamSlots(team, meta).forEach((slot) => {
-        const { key, label } = stickerId(team, slot);
-        ALL_STICKERS[key] = { label, teamName: team.name };
+        const { key, label, isShield } = stickerId(team, slot);
+        ALL_STICKERS[key] = { label, teamName: team.name, isShield };
       });
     });
   });
@@ -243,18 +243,14 @@
     return list;
   }
 
-  function allocationsFor(key) {
-    return listArray()
-      .filter((l) => l.items[key] && l.items[key].qty > 0)
-      .map((l) => ({ list: l, qty: l.items[key].qty }));
-  }
-
   function allocatedQty(key) {
-    return allocationsFor(key).reduce((sum, a) => sum + a.qty, 0);
+    let sum = 0;
+    Object.values(state.tradeLists).forEach((l) => {
+      if (l.items[key]) sum += l.items[key].qty;
+    });
+    return sum;
   }
 
-  // Devolve false quando não há repetida livre pra separar (não dá pra separar
-  // mais do que se tem de sobra).
   function addAllocation(listId, key, label, delta) {
     const list = state.tradeLists[listId];
     if (!list) return false;
@@ -304,14 +300,14 @@
   function separateOneClick(key, label, teamName, onDone) {
     if (activeList()) {
       if (!addAllocation(activeListId, key, label, 1)) showToast(NO_FREE_DUPES_MSG);
-      renderAll();
+      afterChange([key]);
       if (onDone) onDone();
       return;
     }
     openListPicker(`Separar ${label}${teamName ? ' (' + teamName + ')' : ''} pra qual lista?`, (listId) => {
       activeListId = listId;
       if (!addAllocation(listId, key, label, 1)) showToast(NO_FREE_DUPES_MSG);
-      renderAll();
+      afterChange([key]);
       renderSeparationBanner();
       if (onDone) onDone();
     });
@@ -320,7 +316,7 @@
   function unseparateOneClick(key) {
     if (!activeList()) return;
     addAllocation(activeListId, key, null, -1);
-    renderAll();
+    afterChange([key]);
   }
 
   // Usado na tela de "Colar lista": sempre pergunta pra qual lista, mesmo
@@ -331,7 +327,7 @@
     openListPicker(`Separar ${label}${teamName ? ' (' + teamName + ')' : ''} pra qual lista?`, (listId) => {
       if (!addAllocation(listId, key, label, 1)) showToast(NO_FREE_DUPES_MSG);
       activeListId = listId;
-      renderAll();
+      afterChange([key]);
       if (onDone) onDone();
     });
   }
@@ -364,15 +360,30 @@
     return { ownedCodes, totalCodes, ownedCards, totalCards, dupeCodes, dupeUnits, separated: separatedKeys.size };
   }
 
-  // Barra de progresso do header: só o essencial (álbum + cards), pra não
-  // ocupar espaço da tela com números — o detalhe completo mora no menu.
+  // Progresso do topo (álbum + cards), à direita do título. Os números dão um
+  // "pulinho" leve quando mudam; a barra anima por transição de CSS.
+  function setHeaderProgress(textId, fillId, owned, total) {
+    const pct = total ? Math.round((100 * owned) / total) : 0;
+    const text = document.getElementById(textId);
+    const value = `${owned}/${total}`;
+    if (text.textContent !== value) {
+      const hadValue = text.textContent !== '';
+      text.textContent = value;
+      text.title = `${pct}%`;
+      if (hadValue) {
+        text.classList.remove('bump');
+        void text.offsetWidth; // reinicia a animação
+        text.classList.add('bump');
+      }
+    }
+    // mínimo de 2% quando há alguma coisa, pra barra não parecer vazia
+    document.getElementById(fillId).style.width = (owned > 0 ? Math.max(pct, 2) : 0) + '%';
+  }
+
   function renderHeaderProgress() {
     const s = computeSummary();
-    const pct = s.totalCodes ? Math.round((100 * s.ownedCodes) / s.totalCodes) : 0;
-    document.getElementById('albumProgressFill').style.width = pct + '%';
-    document.getElementById('albumProgressText').textContent = `Álbum: ${s.ownedCodes}/${s.totalCodes} (${pct}%)`;
-    const cardsPct = s.totalCards ? Math.round((100 * s.ownedCards) / s.totalCards) : 0;
-    document.getElementById('cardsProgressText').textContent = `Cards: ${s.ownedCards}/${s.totalCards} (${cardsPct}%)`;
+    setHeaderProgress('albumProgressText', 'albumProgressFill', s.ownedCodes, s.totalCodes);
+    setHeaderProgress('cardsProgressText', 'cardsProgressFill', s.ownedCards, s.totalCards);
   }
 
   // Estatísticas completas (repetidas/separadas) ficam no menu lateral.
@@ -390,100 +401,167 @@
 
   const LONG_PRESS_MS = 450;
 
+  // chave -> <div class="sticker"> do DOM atual. Permite atualizar só a célula
+  // tocada (e a barra do time) em vez de reconstruir o álbum inteiro a cada toque.
+  const cellsByKey = new Map();
+
   function stickerCell(team, slot) {
     const { key, label, isShield } = stickerId(team, slot);
+    const div = document.createElement('div');
+    div.className = 'sticker' + (isShield ? ' sticker-shield' : '');
+    div.dataset.key = key;
+    div.dataset.label = label.toLowerCase();
+    paintSticker(div);
+    cellsByKey.set(key, div);
+    return div;
+  }
+
+  // (Re)pinta uma célula a partir do estado atual. Os eventos ficam delegados
+  // em #groups (ver initStickerEvents), então a célula não guarda listeners.
+  function paintSticker(cell) {
+    const key = cell.dataset.key;
+    const meta = ALL_STICKERS[key];
     const count = getCount(key);
+    const allocated = allocatedQty(key);
     const isOwned = count > 0;
     const isDupe = count > 1;
-    const allocated = allocatedQty(key);
-    const div = document.createElement('div');
-    div.className = 'sticker st-' + (isDupe ? 2 : (isOwned ? 1 : 0)) + (isShield ? ' sticker-shield' : '') + (allocated > 0 ? ' separated' : '');
+    cell.classList.toggle('st-0', !isOwned);
+    cell.classList.toggle('st-1', count === 1);
+    cell.classList.toggle('st-2', isDupe);
+    cell.classList.toggle('separated', allocated > 0);
 
-    // Um clique já marca "tenho" (verde); clicar de novo soma repetida (âmbar).
-    // Botão direito depende do navegador/extensões (alguns bloqueiam o
-    // preventDefault do menu nativo), então Shift+clique é o jeito garantido
-    // de remover; o botão direito continua funcionando como atalho extra
-    // onde o navegador permitir.
-    // No modo separando, só as repetidas usam clique pra separar/tirar da
+    // No modo separando, só as repetidas usam o toque pra separar/tirar da
     // lista ativa — figurinhas sem repetida continuam somando/removendo
     // normal, senão não dava pra tirar uma marcação errada de volta a zero
     // enquanto o modo estivesse ligado.
     const separateHere = separationMode && isDupe;
-    div.title = separateHere
-      ? `${label} — clique: separar (+1 na lista ativa) · segurar, shift+clique ou botão direito: tirar (-1)`
-      : `${label}${isShield ? ' — escudo do time' : ''} — ${isDupe ? 'Tenho repetida' : (isOwned ? 'Tenho' : 'Não tenho')}\nClique: marcar/somar · Segurar, Shift+clique ou botão direito: remover`;
+    cell.title = separateHere
+      ? `${meta.label} — clique: separar (+1 na lista ativa) · segurar, shift+clique ou botão direito: tirar (-1)`
+      : `${meta.label}${meta.isShield ? ' — escudo do time' : ''} — ${isDupe ? 'Tenho repetida' : (isOwned ? 'Tenho' : 'Não tenho')}\nClique: marcar/somar · Segurar, Shift+clique ou botão direito: remover`;
 
-    function decrement() {
-      if (separateHere) {
-        unseparateOneClick(key);
-        return;
-      }
-      removeOne(key);
-      renderAll();
-    }
-
-    // No toque não existe Shift nem botão direito confiável (iOS não dispara
-    // `contextmenu`), então segurar o dedo faz o papel de "remover". O `click`
-    // que vem ao soltar é descartado via `longPressed`.
-    let pressTimer = null;
-    let longPressed = false;
-    let touching = false;
-    function cancelPress() {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-    div.addEventListener('pointerdown', (ev) => {
-      touching = ev.pointerType !== 'mouse';
-      if (!touching) return;
-      longPressed = false;
-      cancelPress();
-      pressTimer = setTimeout(() => {
-        longPressed = true;
-        if (navigator.vibrate) navigator.vibrate(15);
-        decrement();
-      }, LONG_PRESS_MS);
-    });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => div.addEventListener(type, cancelPress));
-
-    div.addEventListener('click', (ev) => {
-      if (longPressed) {
-        longPressed = false;
-        return;
-      }
-      if (separateHere) {
-        if (ev.shiftKey) unseparateOneClick(key);
-        else separateOneClick(key, label, team.name);
-        return;
-      }
-      if (ev.shiftKey) removeOne(key);
-      else addOne(key);
-      renderAll();
-    });
-    div.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault();
-      // No toque o menu de contexto nativo é só o "eco" do long-press, que já
-      // foi tratado acima — não remover duas vezes.
-      if (touching) return;
-      decrement();
-    });
-
-    div.textContent = label;
-
-    if (count > 1) {
+    cell.textContent = meta.label;
+    if (isDupe) {
       const extraBadge = document.createElement('span');
       extraBadge.className = 'extra-badge';
       extraBadge.textContent = count - 1;
       extraBadge.title = `${count - 1} repetida(s)`;
-      div.appendChild(extraBadge);
+      cell.appendChild(extraBadge);
     }
     if (allocated > 0) {
       const badge = document.createElement('span');
       badge.className = 'sep-badge';
       badge.textContent = allocated;
       badge.title = `${allocated} separada(s)`;
-      div.appendChild(badge);
+      cell.appendChild(badge);
     }
-    return div;
+  }
+
+  // Depois de mudar contagens/separações de algumas chaves: atualiza só o que
+  // foi afetado (célula, barra do time, filtro ativo, progresso do topo).
+  function afterChange(keys) {
+    const cards = new Set();
+    keys.forEach((key) => {
+      const cell = cellsByKey.get(key);
+      if (!cell) return;
+      paintSticker(cell);
+      cards.add(cell.closest('.team-card'));
+    });
+    const f = filterState();
+    cards.forEach((card) => {
+      updateTeamBar(card);
+      if (f.active) {
+        applyFilterToCard(card, f);
+        updateBlock(card.closest('.group-block'), f);
+      }
+    });
+    if (f.active) refreshFilterUi(f);
+    renderHeaderProgress();
+    renderDrawerStats();
+  }
+
+  function tapSticker(key, shift) {
+    const meta = ALL_STICKERS[key];
+    if (!meta) return;
+    if (separationMode && getCount(key) > 1) {
+      if (shift) unseparateOneClick(key);
+      else separateOneClick(key, meta.label, meta.teamName);
+      return;
+    }
+    if (shift) removeOne(key);
+    else addOne(key);
+    afterChange([key]);
+  }
+
+  function untapSticker(key) {
+    if (!ALL_STICKERS[key]) return;
+    if (separationMode && getCount(key) > 1) {
+      unseparateOneClick(key);
+      return;
+    }
+    removeOne(key);
+    afterChange([key]);
+  }
+
+  // Um único conjunto de listeners em #groups atende todas as células.
+  // No toque não existe Shift nem botão direito confiável (iOS não dispara
+  // `contextmenu`), então segurar o dedo faz o papel de "remover"; o `click`
+  // que vem ao soltar é descartado via `longPressed`.
+  function initStickerEvents() {
+    const groups = document.getElementById('groups');
+    let press = null;
+    let longPressed = false;
+    let touching = false;
+
+    function cancelPress() {
+      if (press) clearTimeout(press.timer);
+      press = null;
+    }
+    function cellOf(ev) {
+      return ev.target.closest ? ev.target.closest('.sticker') : null;
+    }
+
+    groups.addEventListener('pointerdown', (ev) => {
+      const cell = cellOf(ev);
+      if (!cell) return;
+      touching = ev.pointerType !== 'mouse';
+      if (!touching) return;
+      longPressed = false;
+      cancelPress();
+      const key = cell.dataset.key;
+      press = {
+        x: ev.clientX,
+        y: ev.clientY,
+        timer: setTimeout(() => {
+          press = null;
+          longPressed = true;
+          if (navigator.vibrate) navigator.vibrate(15);
+          untapSticker(key);
+        }, LONG_PRESS_MS),
+      };
+    });
+    groups.addEventListener('pointermove', (ev) => {
+      if (press && Math.hypot(ev.clientX - press.x, ev.clientY - press.y) > 10) cancelPress();
+    });
+    ['pointerup', 'pointercancel'].forEach((type) => groups.addEventListener(type, cancelPress));
+
+    groups.addEventListener('click', (ev) => {
+      const cell = cellOf(ev);
+      if (!cell) return;
+      if (longPressed) {
+        longPressed = false;
+        return;
+      }
+      tapSticker(cell.dataset.key, ev.shiftKey);
+    });
+    groups.addEventListener('contextmenu', (ev) => {
+      const cell = cellOf(ev);
+      if (!cell) return;
+      ev.preventDefault();
+      // No toque o menu de contexto nativo é só o "eco" do long-press, que já
+      // foi tratado acima — não remover duas vezes.
+      if (touching) return;
+      untapSticker(cell.dataset.key);
+    });
   }
 
   function teamProgress(team, meta) {
@@ -498,20 +576,62 @@
     return { owned, dupe, separated };
   }
 
+  // Escudo do time: se houver imagem em CRESTS (data.js), usa ela; senão um
+  // escudo em SVG nas cores do time, com o código dentro.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function crestEl(team) {
+    const wrap = document.createElement('span');
+    wrap.className = 'team-crest';
+    const src = typeof CRESTS !== 'undefined' ? CRESTS[team.code] : null;
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      wrap.appendChild(img);
+      return wrap;
+    }
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 34 40');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M17 1.5 31.5 6v13.5c0 9.2-6.3 15.3-14.5 19-8.2-3.7-14.5-9.8-14.5-19V6z');
+    path.setAttribute('fill', team.color);
+    path.setAttribute('stroke', 'rgba(255,255,255,0.55)');
+    path.setAttribute('stroke-width', '1.6');
+    path.setAttribute('stroke-linejoin', 'round');
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', '17');
+    text.setAttribute('y', '24');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('class', 'crest-code');
+    text.textContent = team.code;
+    svg.append(path, text);
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
+  function updateTeamBar(card) {
+    const team = card._team;
+    const meta = teamMeta(team);
+    const progress = teamProgress(team, meta);
+    card.querySelector('.progress-fill-owned').style.width = (100 * (progress.owned - progress.separated) / meta.stickerCount) + '%';
+    card.querySelector('.progress-fill-sep').style.width = (100 * progress.separated / meta.stickerCount) + '%';
+  }
+
   function teamCard(team) {
     const meta = teamMeta(team);
     const card = document.createElement('div');
     card.className = 'team-card';
     card.id = teamId(team);
+    card._team = team;
     card.dataset.search = (team.name + ' ' + team.code).toLowerCase();
 
     const header = document.createElement('div');
     header.className = 'team-header';
 
-    const badge = document.createElement('span');
-    badge.className = 'team-badge';
-    badge.style.background = team.color;
-    badge.textContent = team.code;
+    const badge = crestEl(team);
 
     const name = document.createElement('span');
     name.className = 'team-name';
@@ -530,17 +650,15 @@
     header.append(badge, name, code, copyBtn);
     card.appendChild(header);
 
-    const progress = teamProgress(team, meta);
     const bar = document.createElement('div');
     bar.className = 'progress-bar';
     const ownedFill = document.createElement('div');
     ownedFill.className = 'progress-fill-owned';
-    ownedFill.style.width = (100 * (progress.owned - progress.separated) / meta.stickerCount) + '%';
     const sepFill = document.createElement('div');
     sepFill.className = 'progress-fill-sep';
-    sepFill.style.width = (100 * progress.separated / meta.stickerCount) + '%';
     bar.append(ownedFill, sepFill);
     card.appendChild(bar);
+    updateTeamBar(card);
 
     const grid = document.createElement('div');
     grid.className = 'sticker-grid';
@@ -601,7 +719,7 @@
       });
       if (!targetTeam) return;
       expandSection(targetSection.title);
-      document.getElementById('drawerOverlay').classList.remove('open');
+      closeDrawer();
       requestAnimationFrame(() => {
         const el = document.getElementById(teamId(targetTeam));
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -626,11 +744,13 @@
   function renderGroups() {
     const container = document.getElementById('groups');
     container.innerHTML = '';
+    cellsByKey.clear();
     SECTIONS.forEach((section) => {
       const isCollapsed = collapsedSections.has(section.title);
       const block = document.createElement('section');
       block.className = 'group-block' + (isCollapsed ? ' collapsed' : '');
       block.id = sectionId(section);
+      block.dataset.title = section.title;
 
       const h2 = document.createElement('h2');
       h2.className = 'group-title';
@@ -662,19 +782,91 @@
     renderDrawerStats();
   }
 
-  // ---------- Filter ----------
+  // ---------- Busca e filtros ----------
+
+  // `viewMode` esconde as figurinhas que não interessam pra troca: só as que
+  // faltam, só as repetidas ou só as separadas. A busca casa com o nome/código
+  // do time e, se for exatamente o rótulo de uma figurinha ("233", "E5",
+  // "CB12"), destaca essa figurinha.
+  let viewMode = 'all';
+
+  function filterState() {
+    const q = document.getElementById('filterInput').value.trim().toLowerCase();
+    return { q, mode: viewMode, active: q !== '' || viewMode !== 'all' };
+  }
+
+  function cellPassesMode(key, mode) {
+    if (mode === 'missing') return getCount(key) === 0;
+    if (mode === 'dupes') return getCount(key) > 1;
+    if (mode === 'separated') return allocatedQty(key) > 0;
+    return true;
+  }
+
+  function applyFilterToCard(card, f) {
+    const teamHit = !f.q || card.dataset.search.includes(f.q);
+    let labelHit = false;
+    let anyCell = false;
+    card.querySelectorAll('.sticker').forEach((cell) => {
+      const show = cellPassesMode(cell.dataset.key, f.mode);
+      const hit = show && !!f.q && cell.dataset.label === f.q;
+      cell.classList.toggle('cell-hidden', !show);
+      cell.classList.toggle('found', hit);
+      if (hit) labelHit = true;
+      if (show) anyCell = true;
+    });
+    card.classList.toggle('hidden-by-filter', !((teamHit || labelHit) && anyCell));
+  }
+
+  // Filtrando, as seções recolhidas abrem sozinhas (senão o resultado ficaria
+  // escondido); sem filtro voltam ao estado escolhido pelo usuário.
+  function updateBlock(block, f) {
+    const anyVisible = !!block.querySelector('.team-card:not(.hidden-by-filter)');
+    block.style.display = anyVisible ? '' : 'none';
+    block.classList.toggle('collapsed', collapsedSections.has(block.dataset.title) && !f.active);
+  }
+
+  function refreshFilterUi(f) {
+    const anyCard = !!document.querySelector('.team-card:not(.hidden-by-filter)');
+    document.getElementById('filterEmpty').classList.toggle('hidden', !f.active || anyCard);
+    document.getElementById('searchToggleBtn').classList.toggle('active', f.active);
+  }
 
   function applyFilter() {
-    const q = document.getElementById('filterInput').value.trim().toLowerCase();
-    document.querySelectorAll('.team-card').forEach((card) => {
-      const match = !q || card.dataset.search.includes(q);
-      card.classList.toggle('hidden-by-filter', !match);
+    const f = filterState();
+    document.querySelectorAll('.team-card').forEach((card) => applyFilterToCard(card, f));
+    document.querySelectorAll('.group-block').forEach((block) => updateBlock(block, f));
+    refreshFilterUi(f);
+  }
+
+  let scrollToFoundTimer = null;
+  function scheduleScrollToFound() {
+    clearTimeout(scrollToFoundTimer);
+    scrollToFoundTimer = setTimeout(() => {
+      const el = document.querySelector('.sticker.found');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 400);
+  }
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    document.querySelectorAll('#filterChips [data-mode]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
     });
-    document.querySelectorAll('.group-block').forEach((block) => {
-      const anyVisible = Array.from(block.querySelectorAll('.team-card'))
-        .some((c) => !c.classList.contains('hidden-by-filter'));
-      block.style.display = anyVisible ? '' : 'none';
-    });
+    applyFilter();
+  }
+
+  // Em telas pequenas a busca fica recolhida atrás de um ícone pra não gastar
+  // altura fixa do topo; fechar limpa o filtro (não fica filtro "escondido").
+  function setSearchOpen(open) {
+    const panel = document.getElementById('searchPanel');
+    panel.classList.toggle('open', open);
+    document.getElementById('searchToggleBtn').setAttribute('aria-expanded', String(open));
+    if (open) {
+      document.getElementById('filterInput').focus();
+    } else {
+      document.getElementById('filterInput').value = '';
+      setViewMode('all');
+    }
   }
 
   // ---------- Separation mode ----------
@@ -752,12 +944,14 @@
     });
     document.getElementById('listPickerNewName').value = '';
     document.getElementById('listPickerOverlay').classList.remove('hidden');
+    syncHistory();
     document.getElementById('listPickerNewName').focus();
   }
 
   function closeListPicker() {
     document.getElementById('listPickerOverlay').classList.add('hidden');
     listPickerConfirm = null;
+    syncHistory();
   }
 
   function confirmNewListFromPicker() {
@@ -886,10 +1080,12 @@
   function openMyLists() {
     renderMyLists();
     document.getElementById('myListsOverlay').classList.remove('hidden');
+    syncHistory();
   }
 
   function closeMyLists() {
     document.getElementById('myListsOverlay').classList.add('hidden');
+    syncHistory();
   }
 
   // ---------- Import / verificação ----------
@@ -961,11 +1157,13 @@
     document.getElementById('importOverlay').classList.remove('hidden');
     document.getElementById('importStep1').classList.remove('hidden');
     document.getElementById('importStep2').classList.add('hidden');
+    syncHistory();
     document.getElementById('importText').focus();
   }
 
   function closeImport() {
     document.getElementById('importOverlay').classList.add('hidden');
+    syncHistory();
   }
 
   function currentMatches() {
@@ -1108,14 +1306,14 @@
 
   // ---------- Export / copiar ----------
 
-  function copyDupesForTeams(teams) {
+  function copyForTeams(teams, predicate, emptyMsg, okMsg) {
     const blocks = [];
     teams.forEach((team) => {
       const meta = teamMeta(team);
       const labels = [];
       teamSlots(team, meta).forEach((slot) => {
         const { key, label } = stickerId(team, slot);
-        if (getCount(key) > 1) labels.push(label);
+        if (predicate(getCount(key))) labels.push(label);
       });
       if (labels.length === 0) return;
       const lines = [];
@@ -1126,22 +1324,34 @@
     });
 
     if (blocks.length === 0) {
-      showToast('Nenhuma figurinha repetida para copiar.');
+      showToast(emptyMsg);
       return;
     }
 
     const text = blocks.join('\n\n');
     navigator.clipboard.writeText(text).then(() => {
-      showToast('Lista de repetidas copiada!');
+      showToast(okMsg);
     }).catch(() => {
       window.prompt('Copie manualmente (Ctrl+C):', text);
     });
   }
 
+  function copyDupesForTeams(teams) {
+    copyForTeams(teams, (c) => c > 1, 'Nenhuma figurinha repetida para copiar.', 'Lista de repetidas copiada!');
+  }
+
+  function allTeams() {
+    const teams = [];
+    SECTIONS.forEach((s) => s.teams.forEach((t) => teams.push(t)));
+    return teams;
+  }
+
   function copyAllDupes() {
-    const allTeams = [];
-    SECTIONS.forEach((s) => s.teams.forEach((t) => allTeams.push(t)));
-    copyDupesForTeams(allTeams);
+    copyDupesForTeams(allTeams());
+  }
+
+  function copyAllMissing() {
+    copyForTeams(allTeams(), (c) => c === 0, 'Não falta nenhuma figurinha. Álbum completo!', 'Lista de faltantes copiada!');
   }
 
   // ---------- Exportar / importar dados (backup e transporte entre navegadores) ----------
@@ -1218,6 +1428,75 @@
     applyTheme(next);
   }
 
+  // ---------- Camadas (drawer + modais) e botão "voltar" ----------
+
+  function openDrawer() {
+    document.getElementById('drawerOverlay').classList.add('open');
+    syncHistory();
+  }
+
+  function closeDrawer() {
+    document.getElementById('drawerOverlay').classList.remove('open');
+    syncHistory();
+  }
+
+  function isOpen(id) {
+    const el = document.getElementById(id);
+    return id === 'drawerOverlay' ? el.classList.contains('open') : !el.classList.contains('hidden');
+  }
+
+  function anyLayerOpen() {
+    return ['listPickerOverlay', 'drawerOverlay', 'importOverlay', 'myListsOverlay'].some(isOpen);
+  }
+
+  // Fecha só a camada de cima (o seletor de lista pode estar sobre as outras).
+  function closeTopLayer() {
+    if (isOpen('listPickerOverlay')) closeListPicker();
+    else if (isOpen('drawerOverlay')) closeDrawer();
+    else if (isOpen('importOverlay')) closeImport();
+    else if (isOpen('myListsOverlay')) closeMyLists();
+  }
+
+  // Enquanto houver drawer/modal aberto existe UMA entrada extra no histórico,
+  // então o "voltar" do Android fecha a camada em vez de sair do app. A
+  // sincronização é adiada pra fim do tick: fechar um e abrir outro no mesmo
+  // clique (ex: botão do menu que abre um modal) vira no-op em vez de
+  // empilhar/desempilhar entradas fora de ordem.
+  let historyArmed = false;
+  let syncQueued = false;
+  let ignoreNextPop = false;
+
+  function syncHistory() {
+    if (syncQueued) return;
+    syncQueued = true;
+    setTimeout(() => {
+      syncQueued = false;
+      const want = anyLayerOpen();
+      if (want && !historyArmed) {
+        history.pushState({ layer: true }, '');
+        historyArmed = true;
+      } else if (!want && historyArmed) {
+        historyArmed = false;
+        ignoreNextPop = true;
+        history.back();
+      }
+    }, 0);
+  }
+
+  window.addEventListener('popstate', () => {
+    if (ignoreNextPop) {
+      ignoreNextPop = false;
+      return;
+    }
+    historyArmed = false;
+    closeTopLayer();
+    if (anyLayerOpen()) syncHistory();
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeTopLayer();
+  });
+
   // ---------- Toast ----------
 
   let toastTimer = null;
@@ -1239,7 +1518,17 @@
     renderTeamJump();
     renderAll();
 
-    document.getElementById('filterInput').addEventListener('input', applyFilter);
+    initStickerEvents();
+    document.getElementById('filterInput').addEventListener('input', () => {
+      applyFilter();
+      scheduleScrollToFound();
+    });
+    document.getElementById('searchToggleBtn').addEventListener('click', () => {
+      setSearchOpen(!document.getElementById('searchPanel').classList.contains('open'));
+    });
+    document.querySelectorAll('#filterChips [data-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => setViewMode(btn.dataset.mode));
+    });
     document.getElementById('openImportBtn').addEventListener('click', openImport);
     document.getElementById('closeImportBtn').addEventListener('click', closeImport);
     document.getElementById('analyzeBtn').addEventListener('click', analyzeImport);
@@ -1251,6 +1540,7 @@
     document.getElementById('separateAllBtn').addEventListener('click', separateAllMatches);
     document.getElementById('copyMatchesBtn').addEventListener('click', copyMatches);
     document.getElementById('copyAllBtn').addEventListener('click', copyAllDupes);
+    document.getElementById('copyMissingBtn').addEventListener('click', copyAllMissing);
     document.getElementById('separationModeBtn').addEventListener('click', toggleSeparationMode);
     document.getElementById('importOverlay').addEventListener('click', (ev) => {
       if (ev.target.id === 'importOverlay') closeImport();
@@ -1282,13 +1572,13 @@
     });
 
     const drawerOverlay = document.getElementById('drawerOverlay');
-    document.getElementById('menuFab').addEventListener('click', () => drawerOverlay.classList.add('open'));
-    document.getElementById('closeDrawerBtn').addEventListener('click', () => drawerOverlay.classList.remove('open'));
+    document.getElementById('menuFab').addEventListener('click', openDrawer);
+    document.getElementById('closeDrawerBtn').addEventListener('click', closeDrawer);
     drawerOverlay.addEventListener('click', (ev) => {
-      if (ev.target.id === 'drawerOverlay') drawerOverlay.classList.remove('open');
+      if (ev.target.id === 'drawerOverlay') closeDrawer();
     });
     document.querySelectorAll('.drawer-actions .btn').forEach((btn) => {
-      btn.addEventListener('click', () => drawerOverlay.classList.remove('open'));
+      btn.addEventListener('click', closeDrawer);
     });
   }
 

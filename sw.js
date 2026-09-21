@@ -1,4 +1,4 @@
-const CACHE_NAME = 'figurinhas-brasileirao-2026-v2';
+const CACHE_NAME = 'figurinhas-brasileirao-2026-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -10,9 +10,18 @@ const APP_SHELL = [
   './icons/icon-512.png',
 ];
 
+// Lista dos escudos vem do data.js (mesma fonte que o app usa).
+importScripts('./data.js');
+const CRESTS_SRC = typeof CRESTS !== 'undefined' ? CRESTS : {};
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then((cache) => {
+      // Escudos entram no cache sem travar a instalação: se algum falhar,
+      // o app só usa o escudo em SVG desse time até baixar de novo online.
+      const crests = Object.values(CRESTS_SRC);
+      return cache.addAll(APP_SHELL).then(() => Promise.allSettled(crests.map((u) => cache.add(u))));
+    })
   );
   self.skipWaiting();
 });

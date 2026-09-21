@@ -59,13 +59,27 @@
 <header class="topbar">
   <div class="topbar-row">
     <h1><span data-icon="trophy"></span> Brasileirão 2026</h1>
-    <input type="search" id="filterInput" placeholder="Buscar time ou código…" autocomplete="off">
+    <div class="header-progress" role="group" aria-label="Progresso da coleção">
+      <div class="hp-row">
+        <span class="hp-label">Álbum</span>
+        <div class="hp-bar"><div id="albumProgressFill" class="hp-fill"></div></div>
+        <span id="albumProgressText" class="hp-value"></span>
+      </div>
+      <div class="hp-row">
+        <span class="hp-label">Cards</span>
+        <div class="hp-bar"><div id="cardsProgressFill" class="hp-fill hp-fill-cards"></div></div>
+        <span id="cardsProgressText" class="hp-value"></span>
+      </div>
+    </div>
+    <button id="searchToggleBtn" class="btn-icon search-toggle" aria-label="Buscar e filtrar" aria-expanded="false" aria-controls="searchPanel" data-icon="search"></button>
   </div>
-  <div class="header-progress">
-    <div class="progress-bar-lg"><div id="albumProgressFill" class="progress-bar-lg-fill"></div></div>
-    <div class="header-progress-labels">
-      <span id="albumProgressText"></span>
-      <span id="cardsProgressText"></span>
+  <div id="searchPanel" class="search-panel">
+    <input type="search" id="filterInput" placeholder="Time, código ou número (ex: 233, E5)" autocomplete="off" enterkeyhint="search" aria-label="Buscar time, código ou número da figurinha">
+    <div id="filterChips" class="filter-chips" role="group" aria-label="Mostrar figurinhas">
+      <button class="section-chip" data-mode="all" aria-pressed="true">Todas</button>
+      <button class="section-chip" data-mode="missing" aria-pressed="false">Faltam</button>
+      <button class="section-chip" data-mode="dupes" aria-pressed="false">Repetidas</button>
+      <button class="section-chip" data-mode="separated" aria-pressed="false">Separadas</button>
     </div>
   </div>
 </header>
@@ -75,6 +89,7 @@
 <div id="separationBanner" class="separation-banner hidden"></div>
 
 <main id="groups"></main>
+<p id="filterEmpty" class="filter-empty hidden">Nada encontrado com essa busca/filtro.</p>
 
 <button id="menuFab" class="fab" aria-label="Abrir menu" data-icon="menu"></button>
 
@@ -93,6 +108,7 @@
     <div class="drawer-actions">
       <button id="openImportBtn" class="btn btn-primary" data-icon="clipboard"> Colar lista</button>
       <button id="copyAllBtn" class="btn" data-icon="copy"> Copiar todas as repetidas</button>
+      <button id="copyMissingBtn" class="btn" data-icon="copy"> Copiar as que faltam</button>
       <button id="separationModeBtn" class="btn" data-icon="package"> Modo separando</button>
       <button id="myListsBtn" class="btn" data-icon="folder"> Minhas listas</button>
       <button id="exportJsonBtn" class="btn" data-icon="download"> Exportar dados (JSON)</button>

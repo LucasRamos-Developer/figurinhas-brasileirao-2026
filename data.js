@@ -15,6 +15,52 @@
 //   (CB1..CB2, MAS1..MAS20).
 // - Cards (colecionável à parte, não se cola no álbum): cada categoria tem
 //   seu próprio prefixo + numeração local (PC1..PC6, EST1..EST44, etc.).
+// Escudos dos clubes (Séries A e B): código do time -> arquivo em icons/escudos/.
+// Fonte: footylogos.com. Time sem entrada aqui usa um escudo em SVG nas cores
+// do clube (ver crestEl em script.js).
+const CRESTS = {
+  ACG: 'icons/escudos/acg.svg',
+  AME: 'icons/escudos/ame.svg',
+  ATH: 'icons/escudos/ath.svg',
+  AVA: 'icons/escudos/ava.svg',
+  BAH: 'icons/escudos/bah.svg',
+  BOT: 'icons/escudos/bot.svg',
+  BSP: 'icons/escudos/bsp.svg',
+  CAM: 'icons/escudos/cam.svg',
+  CAP: 'icons/escudos/cap.svg',
+  CEA: 'icons/escudos/cea.svg',
+  CFC: 'icons/escudos/cfc.svg',
+  CHA: 'icons/escudos/cha.svg',
+  COR: 'icons/escudos/cor.svg',
+  CRB: 'icons/escudos/crb.svg',
+  CRI: 'icons/escudos/cri.svg',
+  CRU: 'icons/escudos/cru.svg',
+  CUI: 'icons/escudos/cui.svg',
+  FLA: 'icons/escudos/fla.svg',
+  FLU: 'icons/escudos/flu.svg',
+  FOR: 'icons/escudos/for.svg',
+  GOI: 'icons/escudos/goi.svg',
+  GRE: 'icons/escudos/gre.svg',
+  INT: 'icons/escudos/int.svg',
+  JUV: 'icons/escudos/juv.svg',
+  LON: 'icons/escudos/lon.svg',
+  MIR: 'icons/escudos/mir.svg',
+  NAU: 'icons/escudos/nau.svg',
+  NOV: 'icons/escudos/nov.svg',
+  OPE: 'icons/escudos/ope.svg',
+  PAL: 'icons/escudos/pal.svg',
+  PON: 'icons/escudos/pon.svg',
+  RBB: 'icons/escudos/rbb.svg',
+  REM: 'icons/escudos/rem.svg',
+  SAN: 'icons/escudos/san.svg',
+  SAO: 'icons/escudos/sao.svg',
+  SBE: 'icons/escudos/sbe.svg',
+  SPT: 'icons/escudos/spt.svg',
+  VAS: 'icons/escudos/vas.svg',
+  VIT: 'icons/escudos/vit.svg',
+  VNO: 'icons/escudos/vno.svg',
+};
+
 const PLAYERS_PER_TEAM = 18;
 
 const SECTIONS = [
