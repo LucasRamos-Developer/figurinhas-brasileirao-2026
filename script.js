@@ -72,15 +72,42 @@
     });
   });
 
+  // Só valida FORMATO (contagens inteiras > 0, listas bem formadas), não se a
+  // chave existe no álbum: se um dia o data.js renomear uma chave, o dado
+  // antigo fica guardado em vez de ser descartado em silêncio.
+  function sanitizeState(raw) {
+    if (!raw || typeof raw !== 'object' || !raw.items || typeof raw.items !== 'object' || Array.isArray(raw.items)) {
+      throw new Error('Formato inesperado');
+    }
+    const items = {};
+    Object.keys(raw.items).forEach((key) => {
+      const n = raw.items[key];
+      if (Number.isInteger(n) && n > 0 && n < 1000) items[key] = n;
+    });
+    const tradeLists = {};
+    const rawLists = raw.tradeLists && typeof raw.tradeLists === 'object' ? raw.tradeLists : {};
+    Object.keys(rawLists).forEach((id) => {
+      const l = rawLists[id];
+      if (!l || typeof l !== 'object' || typeof l.name !== 'string' || !l.items || typeof l.items !== 'object') return;
+      const listItems = {};
+      Object.keys(l.items).forEach((key) => {
+        const it = l.items[key];
+        if (it && Number.isInteger(it.qty) && it.qty > 0 && it.qty < 1000) {
+          listItems[key] = { key, label: typeof it.label === 'string' ? it.label : key, qty: it.qty };
+        }
+      });
+      tradeLists[id] = { id, name: l.name, createdAt: Number.isFinite(l.createdAt) ? l.createdAt : 0, items: listItems };
+    });
+    return { items, tradeLists };
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          state.items = parsed.items || {};
-          state.tradeLists = parsed.tradeLists || {};
-        }
+        const clean = sanitizeState(JSON.parse(raw));
+        state.items = clean.items;
+        state.tradeLists = clean.tradeLists;
       }
     } catch (e) {
       console.warn('Falha ao carregar dados salvos, iniciando do zero.', e);
@@ -159,7 +186,28 @@
     } else {
       state.items[key] = count;
     }
+    reconcileAllocations(key);
     save();
+  }
+
+  // Repetidas disponíveis pra separar = contagem - 1 (a primeira fica no álbum).
+  function availableDupes(key) {
+    return Math.max(0, getCount(key) - 1) - allocatedQty(key);
+  }
+
+  // Se a contagem caiu abaixo do que estava separado, tira o excesso das
+  // listas mais recentes — senão sobra "separada" que não existe mais.
+  function reconcileAllocations(key) {
+    let excess = -availableDupes(key);
+    if (excess <= 0) return;
+    listArray().reverse().forEach((list) => {
+      const entry = list.items[key];
+      if (!entry || excess <= 0) return;
+      const cut = Math.min(entry.qty, excess);
+      excess -= cut;
+      if (entry.qty - cut <= 0) delete list.items[key];
+      else entry.qty -= cut;
+    });
   }
 
   function addOne(key) {
@@ -205,26 +253,31 @@
     return allocationsFor(key).reduce((sum, a) => sum + a.qty, 0);
   }
 
+  // Devolve false quando não há repetida livre pra separar (não dá pra separar
+  // mais do que se tem de sobra).
   function addAllocation(listId, key, label, delta) {
     const list = state.tradeLists[listId];
-    if (!list) return;
+    if (!list) return false;
+    if (delta > 0 && availableDupes(key) < delta) return false;
     const current = list.items[key] ? list.items[key].qty : 0;
     const next = current + delta;
     if (next <= 0) {
       delete list.items[key];
     } else {
-      list.items[key] = { key, label, qty: next };
+      list.items[key] = { key, label: label || (list.items[key] && list.items[key].label) || key, qty: next };
     }
     save();
+    return true;
   }
 
   function deliverItem(listId, key) {
     const list = state.tradeLists[listId];
     if (!list || !list.items[key]) return;
     const entry = list.items[key];
-    setCount(key, Math.max(0, getCount(key) - entry.qty));
+    // Remove da lista antes de baixar a contagem, senão a reconciliação
+    // poderia cortar a separação de outra lista em vez desta.
     delete list.items[key];
-    save();
+    setCount(key, Math.max(0, getCount(key) - entry.qty));
   }
 
   function deliverList(listId) {
@@ -246,16 +299,18 @@
     return activeListId ? state.tradeLists[activeListId] : null;
   }
 
+  const NO_FREE_DUPES_MSG = 'Todas as repetidas dessa já estão separadas.';
+
   function separateOneClick(key, label, teamName, onDone) {
     if (activeList()) {
-      addAllocation(activeListId, key, label, 1);
+      if (!addAllocation(activeListId, key, label, 1)) showToast(NO_FREE_DUPES_MSG);
       renderAll();
       if (onDone) onDone();
       return;
     }
     openListPicker(`Separar ${label}${teamName ? ' (' + teamName + ')' : ''} pra qual lista?`, (listId) => {
       activeListId = listId;
-      addAllocation(listId, key, label, 1);
+      if (!addAllocation(listId, key, label, 1)) showToast(NO_FREE_DUPES_MSG);
       renderAll();
       renderSeparationBanner();
       if (onDone) onDone();
@@ -274,7 +329,7 @@
   // silenciosamente.
   function separateOneViaPicker(key, label, teamName, onDone) {
     openListPicker(`Separar ${label}${teamName ? ' (' + teamName + ')' : ''} pra qual lista?`, (listId) => {
-      addAllocation(listId, key, label, 1);
+      if (!addAllocation(listId, key, label, 1)) showToast(NO_FREE_DUPES_MSG);
       activeListId = listId;
       renderAll();
       if (onDone) onDone();
@@ -333,6 +388,8 @@
     `;
   }
 
+  const LONG_PRESS_MS = 450;
+
   function stickerCell(team, slot) {
     const { key, label, isShield } = stickerId(team, slot);
     const count = getCount(key);
@@ -353,9 +410,46 @@
     // enquanto o modo estivesse ligado.
     const separateHere = separationMode && isDupe;
     div.title = separateHere
-      ? `${label} — clique: separar (+1 na lista ativa) · shift+clique ou botão direito: tirar (-1)`
-      : `${label}${isShield ? ' — escudo do time' : ''} — ${isDupe ? 'Tenho repetida' : (isOwned ? 'Tenho' : 'Não tenho')}\nClique: marcar/somar · Shift+clique ou botão direito: remover`;
+      ? `${label} — clique: separar (+1 na lista ativa) · segurar, shift+clique ou botão direito: tirar (-1)`
+      : `${label}${isShield ? ' — escudo do time' : ''} — ${isDupe ? 'Tenho repetida' : (isOwned ? 'Tenho' : 'Não tenho')}\nClique: marcar/somar · Segurar, Shift+clique ou botão direito: remover`;
+
+    function decrement() {
+      if (separateHere) {
+        unseparateOneClick(key);
+        return;
+      }
+      removeOne(key);
+      renderAll();
+    }
+
+    // No toque não existe Shift nem botão direito confiável (iOS não dispara
+    // `contextmenu`), então segurar o dedo faz o papel de "remover". O `click`
+    // que vem ao soltar é descartado via `longPressed`.
+    let pressTimer = null;
+    let longPressed = false;
+    let touching = false;
+    function cancelPress() {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    div.addEventListener('pointerdown', (ev) => {
+      touching = ev.pointerType !== 'mouse';
+      if (!touching) return;
+      longPressed = false;
+      cancelPress();
+      pressTimer = setTimeout(() => {
+        longPressed = true;
+        if (navigator.vibrate) navigator.vibrate(15);
+        decrement();
+      }, LONG_PRESS_MS);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => div.addEventListener(type, cancelPress));
+
     div.addEventListener('click', (ev) => {
+      if (longPressed) {
+        longPressed = false;
+        return;
+      }
       if (separateHere) {
         if (ev.shiftKey) unseparateOneClick(key);
         else separateOneClick(key, label, team.name);
@@ -367,12 +461,10 @@
     });
     div.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
-      if (separateHere) {
-        unseparateOneClick(key);
-        return;
-      }
-      removeOne(key);
-      renderAll();
+      // No toque o menu de contexto nativo é só o "eco" do long-press, que já
+      // foi tratado acima — não remover duas vezes.
+      if (touching) return;
+      decrement();
     });
 
     div.textContent = label;
@@ -617,7 +709,7 @@
     const text = document.createElement('span');
     text.className = 'separation-banner-text';
     text.append(icon('package'), document.createTextNode(
-      ` Modo separando ativo — lista: ${list ? list.name : '(nenhuma)'}. Clique numa repetida pra separar, shift+clique pra tirar.`
+      ` Modo separando ativo — lista: ${list ? list.name : '(nenhuma)'}. Toque numa repetida pra separar, segure pra tirar.`
     ));
 
     const switchBtn = document.createElement('button');
@@ -751,7 +843,7 @@
         plusBtn.appendChild(icon('plus'));
         plusBtn.title = 'Separar mais uma dessa figurinha pra essa lista';
         plusBtn.addEventListener('click', () => {
-          addAllocation(list.id, entry.key, entry.label, 1);
+          if (!addAllocation(list.id, entry.key, entry.label, 1)) showToast(NO_FREE_DUPES_MSG);
           renderAll();
           renderMyLists();
         });
@@ -805,7 +897,9 @@
   // Formato 1: códigos colados junto do número, ex. "E5", "M3" ou "CB3 (x1)".
   const TOKEN_RE = /\b([A-Za-z]{1,4})(\d{1,3})\b/g;
   // Formato 2: código (+ nome) seguido de ":" e números soltos, ex. "CB: 2, 3".
-  const LINE_COLON_RE = /\b([A-Za-z]{1,4})\b[^\n:]{0,24}:\s*([\d,\s]+)/g;
+  // A lista de números fica na MESMA linha (sem \n): senão engolia os números
+  // soltos das linhas seguintes como se fossem do código.
+  const LINE_COLON_RE = /\b([A-Za-z]{1,4})\b[^\n:]{0,24}:[ \t]*([\d,; \t]+)/g;
   // Formato 3: números soltos de jogador/painel/card (sem prefixo), separados
   // por vírgula/ponto-e-vírgula/quebra de linha, ex. "45, 102, 233".
   const BARE_NUM_RE = /(?:^|[,;\n])\s*(\d{1,3})\s*(?=[,;\n]|$)/g;
@@ -829,14 +923,18 @@
       addToken(String(globalNum), String(globalNum));
     }
 
+    // "(x2)" é só a quantidade que o app escreve ao copiar uma lista; sem
+    // tirar, viraria o código "X2".
+    let rest = text.replace(/\(\s*x\s*\d+\s*\)/gi, ' ');
+
     let m;
     TOKEN_RE.lastIndex = 0;
-    while ((m = TOKEN_RE.exec(text)) !== null) {
+    while ((m = TOKEN_RE.exec(rest)) !== null) {
       addCodeToken(m[1].toUpperCase(), parseInt(m[2], 10));
     }
 
     LINE_COLON_RE.lastIndex = 0;
-    while ((m = LINE_COLON_RE.exec(text)) !== null) {
+    while ((m = LINE_COLON_RE.exec(rest)) !== null) {
       const code = m[1].toUpperCase();
       // só aceita se o código+1 for uma figurinha conhecida, pra não
       // confundir palavras curtas do texto com um código.
@@ -845,8 +943,12 @@
       nums.forEach((numStr) => addCodeToken(code, parseInt(numStr, 10)));
     }
 
+    // Os números já consumidos pelo formato "CB: 2, 3" saem do texto antes do
+    // formato de números soltos — senão o "3" também virava jogador nº 3.
+    rest = rest.replace(LINE_COLON_RE, (whole, codeRaw) => (ALL_STICKERS[codeRaw.toUpperCase() + '1'] ? '\n' : whole));
+
     BARE_NUM_RE.lastIndex = 0;
-    while ((m = BARE_NUM_RE.exec(text)) !== null) {
+    while ((m = BARE_NUM_RE.exec(rest)) !== null) {
       addPlayerToken(parseInt(m[1], 10));
     }
 
@@ -876,11 +978,14 @@
     // Sempre pergunta a lista aqui, mesmo com uma lista ativa do "Modo
     // separando" — essa ação é independente daquele modo.
     openListPicker('Separar essa lista inteira pra qual lista?', (listId) => {
-      matches.forEach((t) => addAllocation(listId, t.key, t.label, 1));
+      let done = 0;
+      matches.forEach((t) => { if (addAllocation(listId, t.key, t.label, 1)) done++; });
       activeListId = listId;
       renderAll();
       renderImportMatches();
-      showToast(`${matches.length} figurinha(s) separada(s) em "${state.tradeLists[listId].name}"`);
+      showToast(done > 0
+        ? `${done} figurinha(s) separada(s) em "${state.tradeLists[listId].name}"`
+        : 'Todas essas repetidas já estavam separadas.');
     });
   }
 
@@ -982,15 +1087,23 @@
   }
 
   function applyImportAsDupe() {
-    let applied = 0;
+    // Marca como "tenho" (mínimo 1) sem somar: colar a mesma lista de novo, ou
+    // uma que inclua o que já se tem, não pode virar repetida.
+    let added = 0, already = 0;
     currentTokens.forEach((t) => {
       if (!t.exists) return;
-      addOne(t.key);
-      applied++;
+      if (getCount(t.key) > 0) {
+        already++;
+        return;
+      }
+      setCount(t.key, 1);
+      added++;
     });
     renderAll();
     closeImport();
-    showToast(`${applied} figurinha(s) marcada(s).`);
+    showToast(already > 0
+      ? `${added} nova(s) marcada(s); ${already} você já tinha.`
+      : `${added} figurinha(s) marcada(s).`);
   }
 
   // ---------- Export / copiar ----------
@@ -1058,18 +1171,15 @@
       let incoming;
       try {
         const parsed = JSON.parse(reader.result);
-        incoming = parsed && parsed.state ? parsed.state : parsed;
-        if (!incoming || typeof incoming !== 'object' || typeof incoming.items !== 'object') {
-          throw new Error('Formato inesperado');
-        }
+        incoming = sanitizeState(parsed && parsed.state ? parsed.state : parsed);
       } catch (e) {
         console.warn('Falha ao ler arquivo de importação.', e);
         showToast('Arquivo inválido, não foi possível importar.');
         return;
       }
       if (!window.confirm('Importar vai substituir os dados salvos neste navegador. Continuar?')) return;
-      state.items = incoming.items || {};
-      state.tradeLists = incoming.tradeLists || {};
+      state.items = incoming.items;
+      state.tradeLists = incoming.tradeLists;
       activeListId = null;
       setSeparationMode(false);
       save();

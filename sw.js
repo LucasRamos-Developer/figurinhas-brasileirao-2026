@@ -1,4 +1,4 @@
-const CACHE_NAME = 'figurinhas-brasileirao-2026-v1';
+const CACHE_NAME = 'figurinhas-brasileirao-2026-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -26,20 +26,26 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first para os arquivos do app shell (tudo é local, sem chamadas externas);
-// cai pra rede se algo não estiver no cache ainda.
+// Rede primeiro, cache como reserva: online o usuário sempre recebe a versão
+// mais nova (o data.js já foi corrigido várias vezes e cache-first deixava
+// quem instalou preso na versão antiga); offline cai pro cache. `no-cache`
+// força revalidar com o servidor em vez de usar o cache HTTP do navegador
+// (GitHub Pages serve com max-age de 10 min) — quando nada mudou é só um 304.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
-        return response;
-      }).catch(() => cached);
-    })
+    fetch(event.request, { cache: 'no-cache' }).then((response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      }
+      return response;
+    }).catch(() =>
+      caches.match(event.request, { ignoreSearch: true }).then((cached) =>
+        cached || (event.request.mode === 'navigate' ? caches.match('./index.html') : undefined)
+      )
+    )
   );
 });
