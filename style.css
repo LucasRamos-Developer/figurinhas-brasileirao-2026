@@ -99,14 +99,15 @@ h1 .icon, h3 .icon { margin-right: 6px; }
   gap: 8px;
 }
 .search-panel.open { display: flex; }
-.search-toggle {
+.btn-icon.search-toggle {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel-2);
-  color: var(--text);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
   padding: 8px 10px;
 }
-.search-toggle.active { border-color: var(--accent); color: var(--accent); }
+.btn-icon.search-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.btn-icon.search-toggle.active { border-color: var(--accent); color: var(--accent); }
 .filter-chips {
   display: flex;
   gap: 8px;
@@ -123,7 +124,7 @@ h1 .icon, h3 .icon { margin-right: 6px; }
 }
 @media (min-width: 769px) {
   .search-panel { display: flex; flex-direction: row; align-items: center; }
-  .search-toggle { display: none; }
+  .btn-icon.search-toggle { display: none; }
 }
 
 .title-link { color: inherit; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -451,8 +452,8 @@ main#groups {
 }
 .team-crest {
   flex-shrink: 0;
-  width: 34px;
-  height: 40px;
+  width: 27px;
+  height: 31px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -826,7 +827,7 @@ main#groups {
 @media (pointer: coarse) {
   .btn, .btn-tiny { min-height: 44px; }
   .btn-icon { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  .copy-btn { min-width: 44px; min-height: 44px; }
+  .copy-btn { min-width: 40px; min-height: 40px; }
   .step-mini { width: 44px; height: 44px; }
   .section-chip { min-height: 40px; }
   .group-title { min-height: 48px; }
@@ -887,4 +888,84 @@ main#groups {
 @keyframes drawer-item-in {
   from { opacity: 0; transform: translateX(18px); }
   to { opacity: 1; transform: none; }
+}
+
+/* Toast com ação (Desfazer) */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-action {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.import-needs { margin-top: 14px; }
+
+/* Time recolhido ("já vi esse"): fica só o cabeçalho + barra de progresso. */
+.collapse-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.collapse-btn:hover { border-color: var(--accent); color: var(--accent); }
+.collapse-btn .icon { transition: transform 0.2s ease; margin: 0; }
+.team-card.collapsed .collapse-btn .icon { transform: rotate(-90deg); }
+.team-card.collapsed .progress-bar { margin-bottom: 0; }
+.team-card.collapsed .team-header { margin-bottom: 10px; }
+.team-card.collapsed { opacity: 0.72; }
+.team-card.collapsed .sticker-grid { display: none; }
+.is-searching .team-card.collapsed .sticker-grid { display: grid; }
+.is-searching .team-card.collapsed { opacity: 1; }
+.team-card.complete .team-code { color: var(--accent); }
+.team-card .team-code { font-variant-numeric: tabular-nums; }
+@media (pointer: coarse) {
+  .collapse-btn { min-width: 40px; min-height: 40px; }
+  .btn-icon.search-toggle { min-width: 40px; min-height: 40px; }
+}
+
+@media (max-width: 480px) {
+  .team-crest { width: 25px; height: 29px; }
+  .team-header { gap: 8px; margin-bottom: 6px; }
+}
+
+/* Acessibilidade: foco visível pra teclado, e "tenho" com marca além da cor. */
+.sticker:focus-visible, .group-title:focus-visible, .btn:focus-visible, .btn-icon:focus-visible,
+.copy-btn:focus-visible, .collapse-btn:focus-visible, .section-chip:focus-visible, .title-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sticker.st-1::after {
+  content: "\2713";
+  position: absolute;
+  bottom: 1px;
+  right: 5px;
+  font-size: 0.6rem;
+  opacity: 0.85;
+}
+
+/* Dica de primeira vez */
+.onboarding {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px calc(24px + var(--safe-right)) 0 calc(24px + var(--safe-left));
+  padding: 12px 14px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  animation: sheet-up 0.3s ease-out;
+}
+.onboarding-text { margin: 0; flex: 1; font-size: 0.85rem; line-height: 1.45; }
+.onboarding .dot { vertical-align: middle; }
+@media (max-width: 480px) {
+  .onboarding { flex-direction: column; align-items: stretch; margin: 12px calc(12px + var(--safe-right)) 0 calc(12px + var(--safe-left)); }
 }

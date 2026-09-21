@@ -39,6 +39,7 @@
   // tema errado por uma fração de segundo (o script.js só carrega depois).
   try {
     var t = localStorage.getItem('figurinhas-brasileirao-2026-theme');
+    if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) t = 'light';
     if (t) document.documentElement.setAttribute('data-theme', t);
   } catch (e) {}
 </script>
@@ -89,6 +90,11 @@
 
 <div id="separationBanner" class="separation-banner hidden"></div>
 
+<aside id="onboarding" class="onboarding hidden" aria-label="Como usar">
+  <p class="onboarding-text"><b>Como usar:</b> toque numa figurinha pra marcar <span class="dot dot-1"></span> <b>tenho</b>; toque de novo pra somar <span class="dot dot-2"></span> <b>repetida</b>; <b>segure</b> pra tirar uma. A lupa busca por número (ex: 233) e o botão ao lado do time marca "já vi esse".</p>
+  <button id="onboardingClose" class="btn btn-tiny btn-primary">Entendi</button>
+</aside>
+
 <main id="groups"></main>
 <p id="filterEmpty" class="filter-empty hidden">Nada encontrado com essa busca/filtro.</p>
 
@@ -108,8 +114,11 @@
     </div>
     <div class="drawer-actions">
       <button id="openImportBtn" class="btn btn-primary" data-icon="clipboard"> Colar lista</button>
+      <button id="shareListBtn" class="btn" data-icon="share"> Compartilhar minha lista</button>
+      <button id="copyFullListBtn" class="btn" data-icon="copy"> Copiar minha lista completa</button>
       <button id="copyAllBtn" class="btn" data-icon="copy"> Copiar todas as repetidas</button>
       <button id="copyMissingBtn" class="btn" data-icon="copy"> Copiar as que faltam</button>
+      <button id="expandTeamsBtn" class="btn" data-icon="chevronsUpDown"> Expandir todos os times</button>
       <button id="separationModeBtn" class="btn" data-icon="package"> Modo separando</button>
       <button id="myListsBtn" class="btn" data-icon="folder"> Minhas listas</button>
       <button id="exportJsonBtn" class="btn" data-icon="download"> Exportar dados (JSON)</button>
@@ -136,7 +145,7 @@
     </div>
 
     <div id="importStep1">
-      <p class="hint">Cole a lista de outra pessoa pra ver o que você tem pra trocar, ou a sua própria lista pra marcar como "tenho". Jogadores/painéis são números soltos (ex: <code>45, 102, 233</code>). Escudo, CB, Mascote e Cards usam código+número: <code>E5</code> · <code>CB12</code> · <code>M3</code> · <code>D01</code>. Só os códigos/números são lidos, o resto é ignorado — se um código de card coincidir com o de um escudo (ex: <code>E36</code>), a busca prioriza a figurinha; pra marcar o card nesse caso, clique direto nele na seção Cards.</p>
+      <p class="hint">Cole aqui uma lista do WhatsApp: a de outra pessoa (pra ver o que você tem pra trocar e o que ela tem pra você) ou a sua própria, gerada em <b>Compartilhar minha lista</b> (pra restaurar a coleção). Jogadores/painéis são números soltos (ex: <code>45, 102, 233</code>); escudo, CB, Mascote e Cards usam código+número: <code>E5</code> · <code>CB12</code> · <code>M3</code> · <code>D01</code>. Só os códigos são lidos, o resto é ignorado.</p>
       <textarea id="importText" rows="8" placeholder="Flamengo · repetidas&#10;4, 6, 8, 15, 18&#10;E1"></textarea>
       <div class="modal-actions">
         <button id="analyzeBtn" class="btn btn-primary">Analisar</button>
@@ -157,10 +166,19 @@
             <button id="copyMatchesBtn" class="btn btn-owned hidden" data-icon="copy"> Copiar lista</button>
           </div>
           <div id="importMatches" class="import-matches"></div>
+          <div id="importNeedsBlock" class="import-needs hidden">
+            <h3 data-icon="download"> Ele tem pra você</h3>
+            <div id="importNeedsSummary" class="match-summary"></div>
+            <div class="match-actions">
+              <button id="applyNeedsBtn" class="btn btn-owned hidden" data-icon="check"> Marcar como recebidas</button>
+            </div>
+            <div id="importNeeds" class="import-matches"></div>
+          </div>
         </div>
       </div>
       <div class="modal-actions">
         <button id="backBtn" class="btn">← Voltar</button>
+        <button id="restoreBtn" class="btn btn-dupe hidden">Restaurar minha coleção</button>
         <button id="applyDupeBtn" class="btn btn-dupe">Marcar tudo como Tenho</button>
       </div>
     </div>
@@ -193,7 +211,7 @@
   </div>
 </div>
 
-<div id="toast" class="toast hidden"></div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script src="data.js"></script>
 <script src="script.js"></script>

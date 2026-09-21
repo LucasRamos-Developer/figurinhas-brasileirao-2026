@@ -18,6 +18,8 @@
   // ---------- Ícones (SVG inline, estilo Lucide/MIT — sem CDN, funciona offline) ----------
 
   const ICON_SHAPES = {
+    share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/>',
+    chevronsUpDown: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
     menu: '<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>',
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     clipboard: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
@@ -337,12 +339,14 @@
   // Cards vêm nos envelopes mas não se colam no álbum — contam à parte no
   // progresso, junto com figurinhas nas métricas de repetidas/separadas
   // (que servem pra troca dos dois tipos de colecionável).
+  const CARDS_TITLE = 'Cards';
+
   function computeSummary() {
     let ownedCodes = 0, totalCodes = 0, ownedCards = 0, totalCards = 0, dupeCodes = 0, dupeUnits = 0;
     const separatedKeys = new Set();
     listArray().forEach((l) => Object.keys(l.items).forEach((k) => separatedKeys.add(k)));
     SECTIONS.forEach((section) => {
-      const isCards = section.title === 'Cards';
+      const isCards = section.title === CARDS_TITLE;
       section.teams.forEach((team) => {
         const meta = teamMeta(team);
         teamSlots(team, meta).forEach((slot) => {
@@ -411,6 +415,8 @@
     div.className = 'sticker' + (isShield ? ' sticker-shield' : '');
     div.dataset.key = key;
     div.dataset.label = label.toLowerCase();
+    div.setAttribute('role', 'button');
+    div.tabIndex = -1; // roving tabindex: só uma célula por time entra na ordem do Tab
     paintSticker(div);
     cellsByKey.set(key, div);
     return div;
@@ -439,6 +445,7 @@
       ? `${meta.label} — clique: separar (+1 na lista ativa) · segurar, shift+clique ou botão direito: tirar (-1)`
       : `${meta.label}${meta.isShield ? ' — escudo do time' : ''} — ${isDupe ? 'Tenho repetida' : (isOwned ? 'Tenho' : 'Não tenho')}\nClique: marcar/somar · Segurar, Shift+clique ou botão direito: remover`;
 
+    cell.setAttribute('aria-label', `${meta.label}${meta.isShield ? ', escudo' : ''}: ${isDupe ? `tenho, ${count - 1} repetida(s)` : (isOwned ? 'tenho' : 'não tenho')}${allocated > 0 ? `, ${allocated} separada(s)` : ''}`);
     cell.textContent = meta.label;
     if (isDupe) {
       const extraBadge = document.createElement('span');
@@ -488,7 +495,10 @@
       return;
     }
     if (shift) removeOne(key);
-    else addOne(key);
+    else {
+      addOne(key);
+      if (navigator.vibrate) navigator.vibrate(8);
+    }
     afterChange([key]);
   }
 
@@ -553,6 +563,30 @@
       }
       tapSticker(cell.dataset.key, ev.shiftKey);
     });
+    // Teclado: Enter/Espaço marca, Backspace/Delete tira, setas navegam na grade.
+    groups.addEventListener('focusin', (ev) => {
+      const cell = cellOf(ev);
+      if (!cell) return;
+      Array.from(cell.parentElement.children).forEach((c) => { c.tabIndex = c === cell ? 0 : -1; });
+    });
+    groups.addEventListener('keydown', (ev) => {
+      const cell = cellOf(ev);
+      if (!cell) return;
+      const key = cell.dataset.key;
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        tapSticker(key, false);
+      } else if (ev.key === 'Backspace' || ev.key === 'Delete') {
+        ev.preventDefault();
+        untapSticker(key);
+      } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(ev.key)) {
+        ev.preventDefault();
+        const cells = Array.from(cell.parentElement.children).filter((c) => !c.classList.contains('cell-hidden'));
+        const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -5, ArrowDown: 5 }[ev.key];
+        const target = cells[cells.indexOf(cell) + step];
+        if (target) target.focus();
+      }
+    });
     groups.addEventListener('contextmenu', (ev) => {
       const cell = cellOf(ev);
       if (!cell) return;
@@ -612,12 +646,54 @@
     return wrap;
   }
 
+  // Times já "vistos" numa troca: recolhidos pelo botão do cabeçalho (nome e
+  // escudo não recolhem, pra não recolher sem querer). Fica salvo no aparelho.
+  const COLLAPSED_TEAMS_KEY = 'figurinhas-brasileirao-2026-teams-collapsed';
+  const collapsedTeams = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLLAPSED_TEAMS_KEY) || '[]');
+    if (Array.isArray(saved)) saved.forEach((c) => collapsedTeams.add(String(c)));
+  } catch (e) { /* segue sem preferências salvas */ }
+
+  function saveCollapsedTeams() {
+    try {
+      localStorage.setItem(COLLAPSED_TEAMS_KEY, JSON.stringify(Array.from(collapsedTeams)));
+    } catch (e) { /* segue sem salvar */ }
+  }
+
+  function setTeamCollapsedUi(card, collapsed) {
+    card.classList.toggle('collapsed', collapsed);
+    const btn = card.querySelector('.collapse-btn');
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.setAttribute('aria-label', (collapsed ? 'Expandir ' : 'Recolher ') + card._team.name);
+    btn.title = collapsed ? 'Expandir time' : 'Marcar como visto (recolher)';
+  }
+
+  function toggleTeamCollapsed(card) {
+    const code = card._team.code;
+    const collapsed = !collapsedTeams.has(code);
+    if (collapsed) collapsedTeams.add(code);
+    else collapsedTeams.delete(code);
+    saveCollapsedTeams();
+    setTeamCollapsedUi(card, collapsed);
+  }
+
+  function expandAllTeams() {
+    collapsedTeams.clear();
+    saveCollapsedTeams();
+    document.querySelectorAll('.team-card.collapsed').forEach((card) => setTeamCollapsedUi(card, false));
+    showToast('Todos os times expandidos.');
+  }
+
   function updateTeamBar(card) {
     const team = card._team;
     const meta = teamMeta(team);
     const progress = teamProgress(team, meta);
     card.querySelector('.progress-fill-owned').style.width = (100 * (progress.owned - progress.separated) / meta.stickerCount) + '%';
     card.querySelector('.progress-fill-sep').style.width = (100 * progress.separated / meta.stickerCount) + '%';
+    const count = card.querySelector('.team-code');
+    count.textContent = `${progress.owned}/${meta.stickerCount}`;
+    card.classList.toggle('complete', progress.owned === meta.stickerCount);
   }
 
   function teamCard(team) {
@@ -639,15 +715,21 @@
 
     const code = document.createElement('span');
     code.className = 'team-code';
-    code.textContent = team.code;
+    code.title = team.code;
 
     const copyBtn = document.createElement('button');
     copyBtn.className = 'copy-btn';
     copyBtn.appendChild(icon('copy'));
     copyBtn.title = 'Copiar repetidas desse time';
+    copyBtn.setAttribute('aria-label', 'Copiar repetidas de ' + team.name);
     copyBtn.addEventListener('click', () => copyDupesForTeams([team]));
 
-    header.append(badge, name, code, copyBtn);
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'collapse-btn';
+    collapseBtn.appendChild(icon('chevronDown'));
+    collapseBtn.addEventListener('click', () => toggleTeamCollapsed(card));
+
+    header.append(badge, name, code, copyBtn, collapseBtn);
     card.appendChild(header);
 
     const bar = document.createElement('div');
@@ -663,7 +745,9 @@
     const grid = document.createElement('div');
     grid.className = 'sticker-grid';
     teamSlots(team, meta).forEach((slot) => grid.appendChild(stickerCell(team, slot)));
+    if (grid.firstElementChild) grid.firstElementChild.tabIndex = 0;
     card.appendChild(grid);
+    setTeamCollapsedUi(card, collapsedTeams.has(team.code));
 
     return card;
   }
@@ -739,6 +823,9 @@
     if (collapsedSections.has(title)) collapsedSections.delete(title);
     else collapsedSections.add(title);
     renderGroups();
+    // renderGroups recria o cabeçalho: devolve o foco de teclado pra ele.
+    const again = Array.from(document.querySelectorAll('.group-block')).find((b) => b.dataset.title === title);
+    if (again && document.activeElement === document.body) again.querySelector('.group-title').focus();
   }
 
   function renderGroups() {
@@ -763,7 +850,15 @@
       const chevron = icon('chevronDown');
       chevron.classList.add('group-chevron');
       h2.append(titleText, count, chevron);
+      h2.setAttribute('role', 'button');
+      h2.tabIndex = 0;
       h2.addEventListener('click', () => toggleSection(section.title));
+      h2.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          toggleSection(section.title);
+        }
+      });
       block.appendChild(h2);
 
       const grid = document.createElement('div');
@@ -822,13 +917,17 @@
   function updateBlock(block, f) {
     const anyVisible = !!block.querySelector('.team-card:not(.hidden-by-filter)');
     block.style.display = anyVisible ? '' : 'none';
-    block.classList.toggle('collapsed', collapsedSections.has(block.dataset.title) && !f.active);
+    const collapsed = collapsedSections.has(block.dataset.title) && !f.active;
+    block.classList.toggle('collapsed', collapsed);
+    block.querySelector('.group-title').setAttribute('aria-expanded', String(!collapsed));
   }
 
   function refreshFilterUi(f) {
     const anyCard = !!document.querySelector('.team-card:not(.hidden-by-filter)');
     document.getElementById('filterEmpty').classList.toggle('hidden', !f.active || anyCard);
     document.getElementById('searchToggleBtn').classList.toggle('active', f.active);
+    // Buscando por texto, times recolhidos abrem pra mostrar o resultado.
+    document.getElementById('groups').classList.toggle('is-searching', f.q !== '');
   }
 
   function applyFilter() {
@@ -927,6 +1026,7 @@
   let listPickerConfirm = null;
 
   function openListPicker(title, onConfirm) {
+    rememberFocus();
     listPickerConfirm = onConfirm;
     document.getElementById('listPickerTitle').textContent = title;
     const existingEl = document.getElementById('listPickerExisting');
@@ -992,10 +1092,11 @@
       deliverAllBtn.append(icon('check'), document.createTextNode(' Marcar tudo como entregue'));
       deliverAllBtn.disabled = itemCount === 0;
       deliverAllBtn.addEventListener('click', () => {
-        deliverList(list.id);
-        renderAll();
-        renderMyLists();
-        showToast(`Lista "${list.name}" entregue!`);
+        withUndo(`Lista "${list.name}" entregue!`, () => {
+          deliverList(list.id);
+          renderAll();
+          renderMyLists();
+        });
       });
 
       const deleteBtn = document.createElement('button');
@@ -1046,9 +1147,11 @@
         deliverBtn.className = 'btn btn-owned btn-tiny';
         deliverBtn.append(icon('check'), document.createTextNode(' Entregue'));
         deliverBtn.addEventListener('click', () => {
-          deliverItem(list.id, key);
-          renderAll();
-          renderMyLists();
+          withUndo(`${entry.label} entregue.`, () => {
+            deliverItem(list.id, key);
+            renderAll();
+            renderMyLists();
+          });
         });
 
         row.append(label, minusBtn, plusBtn, deliverBtn);
@@ -1070,17 +1173,15 @@
       return;
     }
     const text = `${list.name}\n` + items.map((it) => `${it.label}${it.qty > 1 ? ' (x' + it.qty + ')' : ''}`).join(', ');
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Lista copiada!');
-    }).catch(() => {
-      window.prompt('Copie manualmente (Ctrl+C):', text);
-    });
+    copyText(text, 'Lista copiada!');
   }
 
   function openMyLists() {
+    rememberFocus();
     renderMyLists();
     document.getElementById('myListsOverlay').classList.remove('hidden');
     syncHistory();
+    document.getElementById('closeMyListsBtn').focus();
   }
 
   function closeMyLists() {
@@ -1100,60 +1201,129 @@
   // por vírgula/ponto-e-vírgula/quebra de linha, ex. "45, 102, 233".
   const BARE_NUM_RE = /(?:^|[,;\n])\s*(\d{1,3})\s*(?=[,;\n]|$)/g;
 
-  function parseTokens(text) {
+  function codeKnown(code) {
+    return !!(ALL_STICKERS[code + '1'] || ALL_STICKERS['card:' + code + '01']);
+  }
+
+  // Acha a chave da figurinha pelo que foi escrito. Cards usam prefixo + 2
+  // dígitos ("D01", "E05") e a chave interna leva "card:"; "E5" (sem zero) é o
+  // escudo. Dentro da seção "Cards" de uma lista compartilhada o card vence.
+  function resolveKey(code, digits, preferCard) {
+    const n = parseInt(digits, 10);
+    const plain = code + n;
+    const card = 'card:' + code + String(n).padStart(2, '0');
+    const written = digits.length >= 2 && digits[0] === '0';
+    const order = preferCard || written ? [card, plain] : [plain, card];
+    return order.find((k) => ALL_STICKERS[k]) || plain;
+  }
+
+  function parseTokens(text, preferCard) {
     const seen = new Set();
     const tokens = [];
 
-    function addToken(key, label) {
+    // Quantidades "233 (x2)" — o que o app escreve ao compartilhar repetidas.
+    const qtyByRaw = {};
+    text.replace(/([A-Za-z]{0,4}\d{1,3})\s*\(\s*x\s*(\d+)\s*\)/gi, (whole, raw, q) => {
+      qtyByRaw[raw.toUpperCase()] = parseInt(q, 10);
+      return whole;
+    });
+
+    function addToken(key, label, raw) {
       if (seen.has(key)) return;
       seen.add(key);
       const known = ALL_STICKERS[key];
-      tokens.push({ key, label, exists: !!known, teamName: known ? known.teamName : null });
+      tokens.push({
+        key,
+        label: known ? known.label : label,
+        exists: !!known,
+        teamName: known ? known.teamName : null,
+        qty: qtyByRaw[raw.toUpperCase()] || 1,
+      });
     }
 
-    function addCodeToken(code, num) {
-      addToken(code + num, code + num);
+    function addCodeToken(code, digits) {
+      addToken(resolveKey(code, digits, preferCard), code + digits, code + digits);
     }
 
-    function addPlayerToken(globalNum) {
-      addToken(String(globalNum), String(globalNum));
+    function addPlayerToken(digits) {
+      addToken(String(parseInt(digits, 10)), String(parseInt(digits, 10)), digits);
     }
 
-    // "(x2)" é só a quantidade que o app escreve ao copiar uma lista; sem
-    // tirar, viraria o código "X2".
+    // "(x2)" só indica quantidade; sem tirar, viraria o código "X2".
     let rest = text.replace(/\(\s*x\s*\d+\s*\)/gi, ' ');
 
     let m;
     TOKEN_RE.lastIndex = 0;
     while ((m = TOKEN_RE.exec(rest)) !== null) {
-      addCodeToken(m[1].toUpperCase(), parseInt(m[2], 10));
+      addCodeToken(m[1].toUpperCase(), m[2]);
     }
 
     LINE_COLON_RE.lastIndex = 0;
     while ((m = LINE_COLON_RE.exec(rest)) !== null) {
       const code = m[1].toUpperCase();
-      // só aceita se o código+1 for uma figurinha conhecida, pra não
-      // confundir palavras curtas do texto com um código.
-      if (!ALL_STICKERS[code + '1']) continue;
+      // só aceita se o código for de figurinha conhecida, pra não confundir
+      // palavras curtas do texto com um código.
+      if (!codeKnown(code)) continue;
       const nums = m[2].match(/\d{1,3}/g) || [];
-      nums.forEach((numStr) => addCodeToken(code, parseInt(numStr, 10)));
+      nums.forEach((digits) => addCodeToken(code, digits));
     }
 
     // Os números já consumidos pelo formato "CB: 2, 3" saem do texto antes do
     // formato de números soltos — senão o "3" também virava jogador nº 3.
-    rest = rest.replace(LINE_COLON_RE, (whole, codeRaw) => (ALL_STICKERS[codeRaw.toUpperCase() + '1'] ? '\n' : whole));
+    rest = rest.replace(LINE_COLON_RE, (whole, codeRaw) => (codeKnown(codeRaw.toUpperCase()) ? '\n' : whole));
 
     BARE_NUM_RE.lastIndex = 0;
     while ((m = BARE_NUM_RE.exec(rest)) !== null) {
-      addPlayerToken(parseInt(m[1], 10));
+      addPlayerToken(m[1]);
     }
 
     return tokens;
   }
 
+  // Lista compartilhada pelo app: seções "REPETIDAS" e "FALTAM" (cada uma com
+  // uma subseção "Cards"). Texto sem seção (uma lista simples colada) cai em
+  // `other`.
+  const SECTION_HEADER_RE = /^[^\p{L}\p{N}]*(repetidas?|faltam|faltantes|cards?)[\s:()\d·—–-]*$/iu;
+
+  function parseShare(text) {
+    const groups = { other: [], dupes: [], missing: [] };
+    let section = 'other';
+    let cards = false;
+    let buf = [];
+    function flush() {
+      if (buf.length) groups[section].push(...parseTokens(buf.join('\n'), cards));
+      buf = [];
+    }
+    text.split(/\r?\n/).forEach((line) => {
+      const h = line.match(SECTION_HEADER_RE);
+      if (!h) {
+        buf.push(line);
+        return;
+      }
+      flush();
+      const word = h[1].toLowerCase();
+      if (word.startsWith('card')) {
+        cards = true;
+      } else {
+        section = word.startsWith('repet') ? 'dupes' : 'missing';
+        cards = false;
+      }
+    });
+    flush();
+    const uniq = (list) => {
+      const seen = new Set();
+      return list.filter((t) => !seen.has(t.key) && seen.add(t.key));
+    };
+    return { other: uniq(groups.other), dupes: uniq(groups.dupes), missing: uniq(groups.missing) };
+  }
+
+  // O que a pessoa procura (lista solta + FALTAM) e o que ela tem de repetida.
   let currentTokens = [];
+  let theirDupes = [];
+  let parsedShare = null;
 
   function openImport() {
+    rememberFocus();
     document.getElementById('importOverlay').classList.remove('hidden');
     document.getElementById('importStep1').classList.remove('hidden');
     document.getElementById('importStep2').classList.add('hidden');
@@ -1177,25 +1347,21 @@
     // separando" — essa ação é independente daquele modo.
     openListPicker('Separar essa lista inteira pra qual lista?', (listId) => {
       let done = 0;
-      matches.forEach((t) => { if (addAllocation(listId, t.key, t.label, 1)) done++; });
-      activeListId = listId;
-      renderAll();
-      renderImportMatches();
-      showToast(done > 0
+      withUndo(() => (done > 0
         ? `${done} figurinha(s) separada(s) em "${state.tradeLists[listId].name}"`
-        : 'Todas essas repetidas já estavam separadas.');
+        : 'Todas essas repetidas já estavam separadas.'), () => {
+        matches.forEach((t) => { if (addAllocation(listId, t.key, t.label, 1)) done++; });
+        activeListId = listId;
+        renderAll();
+        renderImportMatches();
+      });
     });
   }
 
   function copyMatches() {
     const matches = currentMatches();
     if (matches.length === 0) return;
-    const text = matches.map((t) => t.label).join(', ');
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Lista do que você tem copiada!');
-    }).catch(() => {
-      window.prompt('Copie manualmente (Ctrl+C):', text);
-    });
+    copyText(matches.map((t) => t.label).join(', '), 'Lista do que você tem copiada!');
   }
 
   function renderImportMatches() {
@@ -1247,73 +1413,198 @@
     });
   }
 
+  function previewRow(t, statusText, isMatch) {
+    const row = document.createElement('div');
+    row.className = 'preview-row' + (t.exists ? '' : ' unknown') + (isMatch ? ' match' : '');
+    const codeEl = document.createElement('span');
+    codeEl.className = 'preview-code';
+    codeEl.textContent = t.label;
+    const statusEl = document.createElement('span');
+    statusEl.className = 'preview-status';
+    statusEl.textContent = t.exists ? statusText : 'Código não reconhecido no álbum — será ignorado';
+    row.append(codeEl, statusEl);
+    return row;
+  }
+
+  const PREVIEW_LIMIT = 300;
+
   function analyzeImport() {
-    const text = document.getElementById('importText').value;
-    currentTokens = parseTokens(text);
+    parsedShare = parseShare(document.getElementById('importText').value);
+    const seen = new Set();
+    currentTokens = [...parsedShare.other, ...parsedShare.missing].filter((t) => !seen.has(t.key) && seen.add(t.key));
+    theirDupes = parsedShare.dupes;
+
     const preview = document.getElementById('importPreview');
     preview.innerHTML = '';
 
-    if (currentTokens.length === 0) {
-      preview.innerHTML = '<div class="preview-row unknown"><span class="preview-status">Nenhum código reconhecido (ex.: AME1, "JOG: 2, 3" ou um número solto de jogador) foi encontrado no texto.</span></div>';
+    if (currentTokens.length + theirDupes.length === 0) {
+      preview.innerHTML = '<div class="preview-row unknown"><span class="preview-status">Nenhum código reconhecido (ex.: E5, "CB: 2, 3", D01 ou um número solto de jogador) foi encontrado no texto.</span></div>';
     }
 
+    let shown = 0;
     currentTokens.forEach((t) => {
-      const row = document.createElement('div');
+      if (shown++ >= PREVIEW_LIMIT) return;
       const count = t.exists ? getCount(t.key) : 0;
       const isMatch = t.exists && count > 1;
-      row.className = 'preview-row' + (t.exists ? '' : ' unknown') + (isMatch ? ' match' : '');
-      const codeEl = document.createElement('span');
-      codeEl.className = 'preview-code';
-      codeEl.textContent = t.label;
-      const statusEl = document.createElement('span');
-      statusEl.className = 'preview-status';
-      if (t.exists) {
-        statusEl.textContent = isMatch
-          ? `${t.teamName} — você TEM repetida (${count - 1}x), pode oferecer!`
-          : `${t.teamName} — você não tem repetida dessa`;
-      } else {
-        statusEl.textContent = 'Código não reconhecido no álbum — será ignorado';
-      }
-      row.append(codeEl, statusEl);
-      preview.appendChild(row);
+      preview.appendChild(previewRow(t, isMatch
+        ? `${t.teamName} — você TEM repetida (${count - 1}x), pode oferecer!`
+        : `${t.teamName} — você não tem repetida dessa`, isMatch));
     });
+    theirDupes.forEach((t) => {
+      if (shown++ >= PREVIEW_LIMIT) return;
+      const lacking = t.exists && getCount(t.key) === 0;
+      preview.appendChild(previewRow(t, lacking
+        ? `${t.teamName} — ele tem repetida${t.qty > 1 ? ' (' + t.qty + 'x)' : ''} e você NÃO tem, dá pra pedir!`
+        : `${t.teamName} — ele tem repetida, você já tem`, lacking));
+    });
+    if (shown > PREVIEW_LIMIT) {
+      const more = document.createElement('div');
+      more.className = 'preview-row';
+      more.innerHTML = '<span class="preview-status"></span>';
+      more.firstChild.textContent = `… e mais ${shown - PREVIEW_LIMIT} (a lista completa é usada normalmente)`;
+      preview.appendChild(more);
+    }
+
+    // Lista solta = "isso eu tenho" (pode marcar). Lista compartilhada com
+    // seções = a pessoa diz o que FALTA e o que sobra, então marcar tudo como
+    // "tenho" não faz sentido; se for a minha própria lista, dá pra restaurar.
+    const hasSections = parsedShare.missing.length > 0 || parsedShare.dupes.length > 0;
+    document.getElementById('applyDupeBtn').classList.toggle('hidden', hasSections);
+    document.getElementById('restoreBtn').classList.toggle('hidden', parsedShare.missing.length === 0);
 
     renderImportMatches();
+    renderImportNeeds();
 
     document.getElementById('importStep1').classList.add('hidden');
     document.getElementById('importStep2').classList.remove('hidden');
+  }
+
+  function currentNeeds() {
+    return theirDupes.filter((t) => t.exists && getCount(t.key) === 0);
+  }
+
+  function renderImportNeeds() {
+    const block = document.getElementById('importNeedsBlock');
+    const wrap = document.getElementById('importNeeds');
+    const summary = document.getElementById('importNeedsSummary');
+    wrap.innerHTML = '';
+    block.classList.toggle('hidden', theirDupes.length === 0);
+    if (theirDupes.length === 0) return;
+    const needs = currentNeeds();
+    summary.textContent = needs.length > 0
+      ? `Ele tem ${needs.length} que você ainda não tem — dá pra pedir!`
+      : 'Você já tem todas as repetidas dele.';
+    summary.classList.toggle('has-matches', needs.length > 0);
+    document.getElementById('applyNeedsBtn').classList.toggle('hidden', needs.length === 0);
+    needs.forEach((t) => {
+      const row = document.createElement('div');
+      row.className = 'match-row';
+      const label = document.createElement('span');
+      label.className = 'match-label';
+      label.textContent = `${t.label} — ${t.teamName}${t.qty > 1 ? ` (ele tem ${t.qty})` : ''}`;
+      row.appendChild(label);
+      wrap.appendChild(row);
+    });
+  }
+
+  function applyNeedsAsOwned() {
+    const needs = currentNeeds();
+    if (needs.length === 0) return;
+    withUndo(`${needs.length} figurinha(s) marcada(s) como recebida(s).`, () => {
+      needs.forEach((t) => setCount(t.key, 1));
+      renderAll();
+    });
+    renderImportNeeds();
+    renderImportMatches();
   }
 
   function applyImportAsDupe() {
     // Marca como "tenho" (mínimo 1) sem somar: colar a mesma lista de novo, ou
     // uma que inclua o que já se tem, não pode virar repetida.
     let added = 0, already = 0;
-    currentTokens.forEach((t) => {
-      if (!t.exists) return;
-      if (getCount(t.key) > 0) {
-        already++;
-        return;
-      }
-      setCount(t.key, 1);
-      added++;
+    const fresh = currentTokens.filter((t) => t.exists && getCount(t.key) === 0);
+    already = currentTokens.filter((t) => t.exists).length - fresh.length;
+    withUndo(already > 0
+      ? `${fresh.length} nova(s) marcada(s); ${already} você já tinha.`
+      : `${fresh.length} figurinha(s) marcada(s).`, () => {
+      fresh.forEach((t) => { setCount(t.key, 1); added++; });
+      renderAll();
     });
-    renderAll();
     closeImport();
-    showToast(already > 0
-      ? `${added} nova(s) marcada(s); ${already} você já tinha.`
-      : `${added} figurinha(s) marcada(s).`);
+  }
+
+  // A lista colada é a MINHA (gerada por "Compartilhar minha lista"): tudo o
+  // que não está em FALTAM eu tenho, e REPETIDAS traz as sobras.
+  function restoreFromShare() {
+    if (!parsedShare || parsedShare.missing.length === 0) return;
+    if (!window.confirm('Isso substitui a sua coleção atual pela da lista colada (as listas de separadas são mantidas). Dá pra desfazer logo em seguida. Continuar?')) return;
+    const missing = new Set(parsedShare.missing.filter((t) => t.exists).map((t) => t.key));
+    const extra = {};
+    parsedShare.dupes.forEach((t) => { if (t.exists) extra[t.key] = t.qty; });
+    withUndo('Coleção restaurada a partir da lista.', () => {
+      const items = {};
+      Object.keys(ALL_STICKERS).forEach((key) => {
+        if (!missing.has(key)) items[key] = 1 + (extra[key] || 0);
+      });
+      state.items = items;
+      Object.keys(ALL_STICKERS).forEach(reconcileAllocations);
+      save();
+      renderAll();
+    });
+    closeImport();
   }
 
   // ---------- Export / copiar ----------
 
-  function copyForTeams(teams, predicate, emptyMsg, okMsg) {
+  // Copiar: Clipboard API, com fallback pra execCommand (contexto sem HTTPS /
+  // navegadores antigos) e por último o prompt.
+  function copyText(text, okMsg) {
+    function fallback() {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { /* cai no prompt */ }
+      ta.remove();
+      if (ok) showToast(okMsg);
+      else window.prompt('Copie manualmente (Ctrl+C):', text);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => showToast(okMsg)).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  // Compartilhar: folha de compartilhamento do sistema (WhatsApp etc.) no
+  // celular; sem ela, abre o WhatsApp Web; texto grande demais pra URL é copiado.
+  function shareText(text) {
+    if (navigator.share) {
+      navigator.share({ text }).catch((e) => {
+        if (e && e.name !== 'AbortError') copyText(text, 'Lista copiada — cole onde quiser!');
+      });
+      return;
+    }
+    if (text.length < 4000) {
+      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+      return;
+    }
+    copyText(text, 'Lista copiada — cole no WhatsApp!');
+  }
+
+  // Um bloco por time: "CÓDIGO\n a, b, c" (6 por linha). `labelOf` decide o
+  // que entra (ou null pra pular).
+  function listBlocks(teams, labelOf) {
     const blocks = [];
     teams.forEach((team) => {
-      const meta = teamMeta(team);
       const labels = [];
-      teamSlots(team, meta).forEach((slot) => {
+      teamSlots(team, teamMeta(team)).forEach((slot) => {
         const { key, label } = stickerId(team, slot);
-        if (predicate(getCount(key))) labels.push(label);
+        const out = labelOf(getCount(key), label);
+        if (out) labels.push(out);
       });
       if (labels.length === 0) return;
       const lines = [];
@@ -1322,36 +1613,53 @@
       }
       blocks.push(team.code + '\n' + lines.join('\n'));
     });
+    return blocks;
+  }
 
+  const dupeLabel = (c, l) => (c > 1 ? (c > 2 ? `${l} (x${c - 1})` : l) : null);
+  const missingLabel = (c, l) => (c === 0 ? l : null);
+
+  function albumTeams() {
+    return SECTIONS.filter((s) => s.title !== CARDS_TITLE).flatMap((s) => s.teams);
+  }
+
+  function cardTeams() {
+    return SECTIONS.filter((s) => s.title === CARDS_TITLE).flatMap((s) => s.teams);
+  }
+
+  function copyForTeams(teams, labelOf, emptyMsg, okMsg) {
+    const blocks = listBlocks(teams, labelOf);
     if (blocks.length === 0) {
       showToast(emptyMsg);
       return;
     }
-
-    const text = blocks.join('\n\n');
-    navigator.clipboard.writeText(text).then(() => {
-      showToast(okMsg);
-    }).catch(() => {
-      window.prompt('Copie manualmente (Ctrl+C):', text);
-    });
+    copyText(blocks.join('\n\n'), okMsg);
   }
 
   function copyDupesForTeams(teams) {
-    copyForTeams(teams, (c) => c > 1, 'Nenhuma figurinha repetida para copiar.', 'Lista de repetidas copiada!');
-  }
-
-  function allTeams() {
-    const teams = [];
-    SECTIONS.forEach((s) => s.teams.forEach((t) => teams.push(t)));
-    return teams;
+    copyForTeams(teams, dupeLabel, 'Nenhuma figurinha repetida para copiar.', 'Lista de repetidas copiada!');
   }
 
   function copyAllDupes() {
-    copyDupesForTeams(allTeams());
+    copyDupesForTeams(albumTeams().concat(cardTeams()));
   }
 
   function copyAllMissing() {
-    copyForTeams(allTeams(), (c) => c === 0, 'Não falta nenhuma figurinha. Álbum completo!', 'Lista de faltantes copiada!');
+    copyForTeams(albumTeams().concat(cardTeams()), missingLabel, 'Não falta nenhuma figurinha. Álbum completo!', 'Lista de faltantes copiada!');
+  }
+
+  // Lista completa (repetidas + faltam) — dá pra colar de volta no app, aqui
+  // ou em outro aparelho, e ele reconhece as seções.
+  function buildShareText() {
+    const s = computeSummary();
+    const head = `Brasileirão 2026 — álbum ${s.ownedCodes}/${s.totalCodes} · cards ${s.ownedCards}/${s.totalCards}`;
+    function section(title, labelOf) {
+      const album = listBlocks(albumTeams(), labelOf);
+      const cards = listBlocks(cardTeams(), labelOf);
+      if (album.length + cards.length === 0) return '';
+      return [title, album.join('\n\n'), cards.length ? 'Cards\n' + cards.join('\n\n') : ''].filter(Boolean).join('\n');
+    }
+    return [head, section('REPETIDAS', dupeLabel), section('FALTAM', missingLabel)].filter(Boolean).join('\n\n');
   }
 
   // ---------- Exportar / importar dados (backup e transporte entre navegadores) ----------
@@ -1364,10 +1672,20 @@
       state: { items: state.items, tradeLists: state.tradeLists },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const fileName = `figurinhas-brasileirao-2026-${new Date().toISOString().slice(0, 10)}.json`;
+    // No celular, a folha de compartilhar deixa mandar o backup pro WhatsApp,
+    // Drive etc.; no computador segue o download normal.
+    if (window.matchMedia('(pointer: coarse)').matches && window.File && navigator.canShare) {
+      const file = new File([blob], fileName, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'Backup Figurinhas Brasileirão 2026' }).catch(() => {});
+        return;
+      }
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `figurinhas-brasileirao-2026-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1403,16 +1721,23 @@
 
   const THEME_KEY = 'figurinhas-brasileirao-2026-theme';
 
+  // Sem escolha salva, segue o tema do sistema (claro/escuro).
+  function systemTheme() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+
   function getTheme() {
     try {
-      return localStorage.getItem(THEME_KEY) || 'dark';
+      return localStorage.getItem(THEME_KEY) || systemTheme();
     } catch (e) {
-      return 'dark';
+      return systemTheme();
     }
   }
 
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#1a2432');
     const btn = document.getElementById('themeToggleBtn');
     if (!btn) return;
     btn.innerHTML = '';
@@ -1430,9 +1755,17 @@
 
   // ---------- Camadas (drawer + modais) e botão "voltar" ----------
 
+  let lastFocus = null;
+  function rememberFocus() {
+    if (!anyLayerOpen()) lastFocus = document.activeElement;
+  }
+
   function openDrawer() {
+    rememberFocus();
     document.getElementById('drawerOverlay').classList.add('open');
     syncHistory();
+    // o painel ainda está `visibility: hidden` neste instante; foca no próximo quadro
+    setTimeout(() => document.getElementById('closeDrawerBtn').focus(), 60);
   }
 
   function closeDrawer() {
@@ -1472,6 +1805,10 @@
     setTimeout(() => {
       syncQueued = false;
       const want = anyLayerOpen();
+      if (!want && lastFocus) {
+        if (document.contains(lastFocus)) lastFocus.focus();
+        lastFocus = null;
+      }
       if (want && !historyArmed) {
         history.pushState({ layer: true }, '');
         historyArmed = true;
@@ -1493,19 +1830,118 @@
     if (anyLayerOpen()) syncHistory();
   });
 
+  function topLayerEl() {
+    if (isOpen('listPickerOverlay')) return document.querySelector('#listPickerOverlay .modal');
+    if (isOpen('drawerOverlay')) return document.querySelector('#drawerOverlay .drawer');
+    if (isOpen('importOverlay')) return document.querySelector('#importOverlay .modal');
+    if (isOpen('myListsOverlay')) return document.querySelector('#myListsOverlay .modal');
+    return null;
+  }
+
   document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') closeTopLayer();
+    if (ev.key === 'Escape') {
+      closeTopLayer();
+    } else if (ev.key === 'Tab') {
+      // Foco preso na camada aberta (drawer/modal).
+      const layer = topLayerEl();
+      if (!layer) return;
+      const focusables = Array.from(layer.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter((el) => !el.disabled && el.offsetParent !== null);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (!layer.contains(document.activeElement)) {
+        ev.preventDefault();
+        first.focus();
+      } else if (ev.shiftKey && document.activeElement === first) {
+        ev.preventDefault();
+        last.focus();
+      } else if (!ev.shiftKey && document.activeElement === last) {
+        ev.preventDefault();
+        first.focus();
+      }
+    }
   });
 
   // ---------- Toast ----------
 
   let toastTimer = null;
-  function showToast(msg) {
+  function showToast(msg, opts) {
     const el = document.getElementById('toast');
-    el.textContent = msg;
+    el.textContent = '';
+    const text = document.createElement('span');
+    text.textContent = msg;
+    el.appendChild(text);
+    const withAction = opts && opts.actionLabel;
+    if (withAction) {
+      const btn = document.createElement('button');
+      btn.className = 'toast-action';
+      btn.textContent = opts.actionLabel;
+      btn.addEventListener('click', () => {
+        clearTimeout(toastTimer);
+        el.classList.add('hidden');
+        opts.onAction();
+      });
+      el.appendChild(btn);
+    }
     el.classList.remove('hidden');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), withAction ? 6500 : 2600);
+  }
+
+  // Ações grandes (entregar lista, importar, restaurar) ganham "Desfazer" por
+  // alguns segundos: guarda uma foto do estado e devolve se o usuário pedir.
+  function withUndo(message, mutate) {
+    const snap = JSON.stringify({ items: state.items, tradeLists: state.tradeLists });
+    mutate();
+    showToast(typeof message === 'function' ? message() : message, {
+      actionLabel: 'Desfazer',
+      onAction: () => {
+        const clean = sanitizeState(JSON.parse(snap));
+        state.items = clean.items;
+        state.tradeLists = clean.tradeLists;
+        if (activeListId && !state.tradeLists[activeListId]) activeListId = null;
+        save();
+        renderAll();
+        renderSeparationBanner();
+        if (isOpen('myListsOverlay')) renderMyLists();
+        showToast('Desfeito.');
+      },
+    });
+  }
+
+  // ---------- Acessibilidade dos diálogos + onboarding ----------
+
+  function initDialogsA11y() {
+    const drawer = document.querySelector('.drawer');
+    drawer.setAttribute('role', 'dialog');
+    drawer.setAttribute('aria-modal', 'true');
+    drawer.setAttribute('aria-label', 'Menu');
+    document.querySelectorAll('.modal').forEach((modal, i) => {
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      const h = modal.querySelector('h2');
+      if (h) {
+        if (!h.id) h.id = 'dialogTitle' + i;
+        modal.setAttribute('aria-labelledby', h.id);
+      }
+    });
+  }
+
+  const ONBOARDING_KEY = 'figurinhas-brasileirao-2026-onboarded';
+
+  // Dica de primeira vez (só pra quem ainda não marcou nada): como marcar,
+  // repetir e tirar. Some com "Entendi" e não volta.
+  function initOnboarding() {
+    const box = document.getElementById('onboarding');
+    let seen = false;
+    try { seen = !!localStorage.getItem(ONBOARDING_KEY); } catch (e) { /* mostra sempre */ }
+    if (seen || Object.keys(state.items).length > 0) return;
+    box.classList.remove('hidden');
+    document.getElementById('onboardingClose').addEventListener('click', () => {
+      box.classList.add('hidden');
+      try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (e) { /* ignora */ }
+    });
   }
 
   // ---------- Wiring ----------
@@ -1519,6 +1955,9 @@
     renderAll();
 
     initStickerEvents();
+    initDialogsA11y();
+    initOnboarding();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     document.getElementById('titleLink').addEventListener('click', (ev) => {
       ev.preventDefault();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1545,6 +1984,11 @@
     document.getElementById('copyMatchesBtn').addEventListener('click', copyMatches);
     document.getElementById('copyAllBtn').addEventListener('click', copyAllDupes);
     document.getElementById('copyMissingBtn').addEventListener('click', copyAllMissing);
+    document.getElementById('shareListBtn').addEventListener('click', () => shareText(buildShareText()));
+    document.getElementById('copyFullListBtn').addEventListener('click', () => copyText(buildShareText(), 'Lista completa copiada!'));
+    document.getElementById('expandTeamsBtn').addEventListener('click', expandAllTeams);
+    document.getElementById('restoreBtn').addEventListener('click', restoreFromShare);
+    document.getElementById('applyNeedsBtn').addEventListener('click', applyNeedsAsOwned);
     document.getElementById('separationModeBtn').addEventListener('click', toggleSeparationMode);
     document.getElementById('importOverlay').addEventListener('click', (ev) => {
       if (ev.target.id === 'importOverlay') closeImport();
